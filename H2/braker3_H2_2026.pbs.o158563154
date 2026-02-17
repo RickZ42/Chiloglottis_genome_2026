@@ -1,0 +1,21 @@
+==============================
+BRAKER3 H2 2026
+MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked
+WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3/H2_2026_v1
+RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis
+THREADS       : 48
+BUSCO         : embryophyta_odb10
+==============================
+
+======================================================================================
+                  Resource Usage on 2026-01-20 09:59:01:
+   Job Id:             158563154.gadi-pbs
+   Project:            xf3
+   Exit Status:        0
+   Service Units:      6073.09
+   NCPUs Requested:    48                     NCPUs Used: 48              
+                                           CPU Time Used: 2774:15:17      
+   Memory Requested:   180.0GB               Memory Used: 133.07GB        
+   Walltime requested: 96:00:00            Walltime Used: 63:15:41        
+   JobFS requested:    400.0GB                JobFS used: 0B              
+======================================================================================

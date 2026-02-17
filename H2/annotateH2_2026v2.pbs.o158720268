@@ -1,0 +1,23 @@
+==============================
+BRAKER3 H2 2026 (RESUME MODE)
+MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked
+WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3v2/H2_2026_v1
+RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/trimmed_chiloglottis
+RNA_IDS       : 129_S120,130_S121,131_S122,104C_S7,104L_S19,105C_S8,106C_S4,106L_S16,107C_S5,112c_S1,129L_S22,141L_S13,142C_S2,142L_S14,151C_S11,151L_S23,175C_S12,175L_S24,4_S17
+PROT_SEQ      : /g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa
+THREADS       : 48
+BUSCO         : embryophyta_odb10
+==============================
+
+======================================================================================
+                  Resource Usage on 2026-01-19 19:39:43:
+   Job Id:             158720268.gadi-pbs
+   Project:            xf3
+   Exit Status:        271 (Linux Signal 15 SIGTERM Termination)
+   Service Units:      0.96
+   NCPUs Requested:    48                     NCPUs Used: 48              
+                                           CPU Time Used: 00:00:12        
+   Memory Requested:   180.0GB               Memory Used: 6.39GB          
+   Walltime requested: 48:00:00            Walltime Used: 00:00:36        
+   JobFS requested:    400.0GB                JobFS used: 0B              
+======================================================================================

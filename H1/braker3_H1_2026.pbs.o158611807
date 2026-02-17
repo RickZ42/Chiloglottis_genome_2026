@@ -1,0 +1,22 @@
+==============================
+BRAKER3 H1 2026 (RESUME MODE)
+MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked
+WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3/H1_2026_v1
+RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis
+THREADS       : 48
+BUSCO         : embryophyta_odb10
+==============================
+[DONE] BRAKER finished. Log: /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3/H1_2026_v1/braker3_H1_2026.20260118_162605.log
+
+======================================================================================
+                  Resource Usage on 2026-01-19 19:56:28:
+   Job Id:             158611807.gadi-pbs
+   Project:            xf3
+   Exit Status:        0
+   Service Units:      2640.69
+   NCPUs Requested:    48                     NCPUs Used: 48              
+                                           CPU Time Used: 1110:40:42      
+   Memory Requested:   180.0GB               Memory Used: 129.1GB         
+   Walltime requested: 96:00:00            Walltime Used: 27:30:26        
+   JobFS requested:    400.0GB                JobFS used: 0B              
+======================================================================================

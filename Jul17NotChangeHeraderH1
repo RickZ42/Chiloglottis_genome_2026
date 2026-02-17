@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -P fa63
+#PBS -q normal
+#PBS -l walltime=24:00:00
+#PBS -l ncpus=48
+#PBS -l mem=190GB
+#PBS -l jobfs=400GB
+#PBS -l storage=scratch/xf3+gdata/xf3+gdata/xe2
+#PBS -m abe
+#PBS -M Zirui.Zhang@anu.edu.au 
+
+set -euo pipefail
+
+source /g/data/xf3/miniconda/etc/profile.d/conda.sh
+conda activate orthofinder
+
+orthofinder -t 40 -a 8 -f /g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026 -I 1.3 -M msa 

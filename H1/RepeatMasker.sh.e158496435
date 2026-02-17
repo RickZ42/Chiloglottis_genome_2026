@@ -1,0 +1,13 @@
++ export PATH=/g/data/xf3/zz3507/app/RepeatMaskerV2/RepeatMasker_setup/RepeatMasker:/g/data/xf3/zz3507/app/RepeatMaskerV2/RepeatMasker_setup/RepeatModeler:/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin
++ PATH=/g/data/xf3/zz3507/app/RepeatMaskerV2/RepeatMasker_setup/RepeatMasker:/g/data/xf3/zz3507/app/RepeatMaskerV2/RepeatMasker_setup/RepeatModeler:/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin
++ GENOME=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/H1_2026_v1.top20.fa
++ LIB=/g/data/xf3/zz3507/Output/AfterHiCProcessing/H1V3H2V7ReferenceAUG17FFF/H1/RepeatModeler/123094750.gadi-pbs/AUG17H1V3FFF.500K.20scaffold-families.fa
++ OUTDIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ mkdir -p /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ cd /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ RepeatMasker -pa 48 -e rmblast -gff -xsmall -lib /g/data/xf3/zz3507/Output/AfterHiCProcessing/H1V3H2V7ReferenceAUG17FFF/H1/RepeatModeler/123094750.gadi-pbs/AUG17H1V3FFF.500K.20scaffold-families.fa -dir /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/H1_2026_v1.top20.fa
+Traceback (most recent call last):
+  File "/g/data/xf3/zz3507/app/RepeatMaskerV2/RepeatMasker_setup/RepeatMasker/famdb.py", line 55, in <module>
+    import h5py
+ModuleNotFoundError: No module named 'h5py'
+cp: cannot stat '/home/106/zz3507/.RepeatMaskerCache//general.working/*': No such file or directory

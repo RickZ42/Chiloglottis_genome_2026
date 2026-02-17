@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -l mem=180GB
+#PBS -l walltime=48:00:00
+#PBS -l ncpus=48
+#PBS -l jobfs=400GB
+#PBS -l wd
+#PBS -l storage=scratch/xf3+gdata/xf3+gdata/xe2+gdata/fa63
+#PBS -P xf3
+
+set -euo pipefail
+set -x
+
+module load singularity
+
+############################################
+# Paths (H1 2026 updated genome)
+############################################
+RM_DIR="/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker"
+WORKDIR="/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3/H1_2026_v1"
+BRAKER_SIF="/g/data/xf3/zz3507/app/braker3.sif"
+
+############################################
+# Auto-detect masked genome file
+############################################
+GENOME_MASKED="$(ls -1 ${RM_DIR}/*.masked 2>/dev/null | head -n 1 || true)"
+if [[ -z "${GENOME_MASKED}" ]]; then
+  echo "ERROR: cannot find masked genome (*.masked) in ${RM_DIR}" >&2
+  exit 1
+fi
+
+############################################
+# RNA-seq settings
+############################################
+RNA_DIR="/g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis"
+RNA_IDS="104C_S7,104L_S19,105C_S8,105L_S20,106C_S4,106L_S16,107C_S5,107L_S17,112c_S1,129C_S10,129L_S22,141C_S1,141L_S13,142C_S2,142L_S14,143C_S3,143L_S15,147C_S9,147L_S21,148C_S6,148L_S18,151C_S11,151L_S23,175C_S12,175L_S24,4_S17"
+
+############################################
+# Make sure workdir exists
+############################################
+mkdir -p "${WORKDIR}"
+
+############################################
+# (Optional but recommended)
+# If last time failed at compleasm_to_hints, clean only that part
+############################################
+if [[ -f "${WORKDIR}/errors/compleasm_to_hints.stderr" ]]; then
+  echo "[INFO] Found previous compleasm_to_hints.stderr -> cleaning partial compleasm outputs for retry"
+  rm -rf "${WORKDIR}/compleasm_genome_out" "${WORKDIR}/compleasm_hints.gff" || true
+
+  find "${WORKDIR}/mb_downloads" -type f \( -name "*.tmp" -o -name "*.part" -o -name "*incomplete*" \) -delete 2>/dev/null || true
+fi
+
+############################################
+# Run BRAKER3 with resume
+############################################
+echo "=============================="
+echo "BRAKER3 H1 2026 (RESUME MODE)"
+echo "MASKED GENOME : ${GENOME_MASKED}"
+echo "WORKDIR       : ${WORKDIR}"
+echo "RNA_DIR       : ${RNA_DIR}"
+echo "THREADS       : 48"
+echo "BUSCO         : embryophyta_odb10"
+echo "=============================="
+
+
+LOG="${WORKDIR}/braker3_H1_2026.$(date +%Y%m%d_%H%M%S).log"
+
+singularity exec \
+  -B /g/data:/g/data \
+  -B /scratch:/scratch \
+  "${BRAKER_SIF}" \
+  braker.pl \
+    --genome="${GENOME_MASKED}" \
+    --workingdir="${WORKDIR}" \
+    --rnaseq_sets_ids="${RNA_IDS}" \
+    --rnaseq_sets_dirs="${RNA_DIR}" \
+    --threads 48 \
+    --busco_lineage embryophyta_odb10 \
+    --useexisting \
+  &> "${LOG}"
+
+echo "[DONE] BRAKER finished. Log: ${LOG}"

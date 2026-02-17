@@ -1,0 +1,23 @@
+x==============================
+BRAKER3 H1 2026 (RESUME MODE)
+MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked
+WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v2/H1_2026_v1
+RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/trimmed_chiloglottis
+RNA_IDS       : 129_S120,130_S121,131_S122,104C_S7,104L_S19,105C_S8,106C_S4,106L_S16,107C_S5,112c_S1,129L_S22,141L_S13,142C_S2,142L_S14,151C_S11,151L_S23,175C_S12,175L_S24,4_S17
+PROT_SEQ      : /g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa
+THREADS       : 48
+BUSCO         : embryophyta_odb10
+==============================
+[DONE] BRAKER finished. Log: /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v2/H1_2026_v1/braker3_H1_2026.trimmedRNA_prot.20260119_192029.log
+
+======================================================================================
+                  Resource Usage on 2026-01-20 16:15:14:
+   Job Id:             158718409.gadi-pbs
+   Project:            xf3
+   Exit Status:        0
+   Service Units:      2007.87
+   NCPUs Requested:    48                  CPU Time Used: 472:04:19       
+   Memory Requested:   180.0GB               Memory Used: 123.68GB        
+   Walltime Requested: 48:00:00            Walltime Used: 20:54:55        
+   JobFS Requested:    400.0GB                JobFS Used: 0B              
+======================================================================================

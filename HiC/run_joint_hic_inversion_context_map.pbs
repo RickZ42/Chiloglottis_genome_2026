@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -N hicINVctx_juicer_2026
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l mem=190GB
+#PBS -l ncpus=48
+#PBS -l jobfs=400GB
+#PBS -l storage=gdata/xf3+gdata/if89
+#PBS -l wd
+#PBS -o /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_context_joint/hic_inv_context_juicer.o${PBS_JOBID}
+#PBS -e /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_context_joint/hic_inv_context_juicer.e${PBS_JOBID}
+
+set -euo pipefail
+
+mkdir -p /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_context_joint
+
+SCRIPT="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/HiC/run_joint_hic_inversion_context_map.sh"
+export JAVA_XMX=120g
+
+bash "$SCRIPT" \
+  --threads 48 \
+  --mapq 30 \
+  --bin-size 100000 \
+  --flank-bp 3000000 \
+  --min-inv-len 500000 \
+  --max-inversions 8 \
+  --priority-scaffolds scaffold_5,scaffold_10,scaffold_19,scaffold_20 \
+  --norm KR \
+  --fallback-norm VC_SQRT

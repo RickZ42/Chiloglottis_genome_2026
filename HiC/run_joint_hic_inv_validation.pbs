@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -N hicINV_joint_2026
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l mem=192GB
+#PBS -l ncpus=48
+#PBS -l jobfs=400GB
+#PBS -l storage=gdata/xf3+gdata/if89
+#PBS -l wd
+#PBS -o /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_validation_joint/hic_inv_validation.o${PBS_JOBID}
+#PBS -e /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_validation_joint/hic_inv_validation.e${PBS_JOBID}
+
+set -euo pipefail
+
+SCRIPT="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/HiC/run_joint_hic_inv_validation.sh"
+
+mkdir -p /g/data/xf3/zz3507/Output/20260127Genome/hic_inv_validation_joint
+
+bash "$SCRIPT" \
+  --threads 48 \
+  --mapq 20 \
+  --flank-bp 200000 \
+  --min-bp-pairs 25 \
+  --min-bp-to-ctrl-frac 0.15 \
+  --priority-scaffolds scaffold_5,scaffold_10,scaffold_19,scaffold_20
+

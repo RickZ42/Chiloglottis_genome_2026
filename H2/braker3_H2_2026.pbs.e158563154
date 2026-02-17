@@ -1,0 +1,57 @@
++ module load singularity
++ unset _mlshdbg
++ '[' 0 = 1 ']'
++ unset _mlre _mlIFS
++ '[' -n x ']'
++ _mlIFS=' 	
+'
++ IFS=' '
++ '[' -n '' ']'
+++ /usr/bin/tclsh /opt/Modules/v4.3.0/libexec/modulecmd.tcl bash load singularity
++ eval '_LMFILES__modshare=/opt/Modules/modulefiles/singularity:1;' export '_LMFILES__modshare;
+LOADEDMODULES_modshare=singularity:1;' export 'LOADEDMODULES_modshare;
+PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin;' export 'PATH;
+_LMFILES_=/opt/Modules/modulefiles/singularity;' export '_LMFILES_;
+LOADEDMODULES=singularity;' export 'LOADEDMODULES;
+PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1;' export 'PATH_modshare;
+test' '0;'
+++ _LMFILES__modshare=/opt/Modules/modulefiles/singularity:1
+++ export _LMFILES__modshare
+++ LOADEDMODULES_modshare=singularity:1
+++ export LOADEDMODULES_modshare
+++ PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin
+++ export PATH
+++ _LMFILES_=/opt/Modules/modulefiles/singularity
+++ export _LMFILES_
+++ LOADEDMODULES=singularity
+++ export LOADEDMODULES
+++ PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1
+++ export PATH_modshare
+++ test 0
++ _mlstatus=0
++ '[' -n x ']'
++ IFS=' 	
+'
++ unset _mlre _mlv _mlrv _mlIFS
++ '[' -n '' ']'
++ unset _mlshdbg
++ return 0
++ RM_DIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker
++ WORKDIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3/H2_2026_v1
++ BRAKER_SIF=/g/data/xf3/zz3507/app/braker3.sif
+++ head -n 1
+++ ls -1 /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked
++ GENOME_MASKED=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked
++ [[ -z /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked ]]
++ RNA_DIR=/g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis
++ RNA_IDS=104C_S7,104L_S19,105C_S8,105L_S20,106C_S4,106L_S16,107C_S5,107L_S17,112c_S1,129C_S10,129L_S22,141C_S1,141L_S13,142C_S2,142L_S14,143C_S3,143L_S15,147C_S9,147L_S21,148C_S6,148L_S18,151C_S11,151L_S23,175C_S12,175L_S24,4_S17
++ mkdir -p /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3/H2_2026_v1
++ echo ==============================
++ echo 'BRAKER3 H2 2026'
++ echo 'MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked'
++ echo 'WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3/H2_2026_v1'
++ echo 'RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis'
++ echo 'THREADS       : 48'
++ echo 'BUSCO         : embryophyta_odb10'
++ echo ==============================
++ singularity exec -B /g/data/xf3/zz3507/script/Chiloglottis_genome_2026/H2:/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/H2 /g/data/xf3/zz3507/app/braker3.sif braker.pl --genome=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/RepeatMasker/H2_2026_v1.fa.masked --workingdir=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H2/BRAKER3/H2_2026_v1 --rnaseq_sets_ids=104C_S7,104L_S19,105C_S8,105L_S20,106C_S4,106L_S16,107C_S5,107L_S17,112c_S1,129C_S10,129L_S22,141C_S1,141L_S13,142C_S2,142L_S14,143C_S3,143L_S15,147C_S9,147L_S21,148C_S6,148L_S18,151C_S11,151L_S23,175C_S12,175L_S24,4_S17 --rnaseq_sets_dirs=/g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/chiloglottis --threads 48 --busco_lineage embryophyta_odb10

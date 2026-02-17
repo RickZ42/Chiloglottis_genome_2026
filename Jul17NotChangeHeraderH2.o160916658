@@ -1,0 +1,17 @@
+
+OrthoFinder version 2.5.5 Copyright (C) 2014 David Emms
+
+Specified directory doesn't exist: /g/data/xf3/zz3507/script/Chiloglottis_genome_2026/Jul17NotChangeHerader/
+ERROR: An error occurred, ***please review the error messages*** they may contain useful information about the problem.
+
+======================================================================================
+                  Resource Usage on 2026-02-14 23:01:48:
+   Job Id:             160916658.gadi-pbs
+   Project:            fa63
+   Exit Status:        1
+   Service Units:      1.87
+   NCPUs Requested:    48                  CPU Time Used: 00:00:04        
+   Memory Requested:   190.0GB               Memory Used: 408.16MB        
+   Walltime Requested: 24:00:00            Walltime Used: 00:01:10        
+   JobFS Requested:    400.0GB                JobFS Used: 0B              
+======================================================================================

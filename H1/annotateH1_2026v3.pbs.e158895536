@@ -1,0 +1,65 @@
++ module load singularity
++ unset _mlshdbg
++ '[' 0 = 1 ']'
++ unset _mlre _mlIFS
++ '[' -n x ']'
++ _mlIFS=' 	
+'
++ IFS=' '
++ '[' -n '' ']'
+++ /usr/bin/tclsh /opt/Modules/v4.3.0/libexec/modulecmd.tcl bash load singularity
++ eval '_LMFILES__modshare=/opt/Modules/modulefiles/singularity:1;' export '_LMFILES__modshare;
+LOADEDMODULES_modshare=singularity:1;' export 'LOADEDMODULES_modshare;
+PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin;' export 'PATH;
+_LMFILES_=/opt/Modules/modulefiles/singularity;' export '_LMFILES_;
+LOADEDMODULES=singularity;' export 'LOADEDMODULES;
+PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1;' export 'PATH_modshare;
+test' '0;'
+++ _LMFILES__modshare=/opt/Modules/modulefiles/singularity:1
+++ export _LMFILES__modshare
+++ LOADEDMODULES_modshare=singularity:1
+++ export LOADEDMODULES_modshare
+++ PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin
+++ export PATH
+++ _LMFILES_=/opt/Modules/modulefiles/singularity
+++ export _LMFILES_
+++ LOADEDMODULES=singularity
+++ export LOADEDMODULES
+++ PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1
+++ export PATH_modshare
+++ test 0
++ _mlstatus=0
++ '[' -n x ']'
++ IFS=' 	
+'
++ unset _mlre _mlv _mlrv _mlIFS
++ '[' -n '' ']'
++ unset _mlshdbg
++ return 0
++ RM_DIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ WORKDIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026
++ BRAKER_SIF=/g/data/xf3/zz3507/app/braker3.2026.sif
+++ head -n 1
+++ ls -1 /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked
++ GENOME_MASKED=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked
++ [[ -z /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked ]]
++ PROT_SEQ=/g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa
++ [[ ! -s /g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa ]]
++ RNA_DIR=/g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/trimmed_chiloglottis
++ RNA_IDS=129_S120,130_S121,131_S122,104C_S7,104L_S19,105C_S8,106C_S4,106L_S16,107C_S5,112c_S1,129L_S22,141L_S13,142C_S2,142L_S14,151C_S11,151L_S23,175C_S12,175L_S24,4_S17
++ mkdir -p /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026
++ [[ -f /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026/errors/compleasm_to_hints.stderr ]]
++ echo ==============================
++ echo 'BRAKER3 H1 2026 (RESUME MODE)'
++ echo 'MASKED GENOME : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked'
++ echo 'WORKDIR       : /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026'
++ echo 'RNA_DIR       : /g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/trimmed_chiloglottis'
++ echo 'RNA_IDS       : 129_S120,130_S121,131_S122,104C_S7,104L_S19,105C_S8,106C_S4,106L_S16,107C_S5,112c_S1,129L_S22,141L_S13,142C_S2,142L_S14,151C_S11,151L_S23,175C_S12,175L_S24,4_S17'
++ echo 'PROT_SEQ      : /g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa'
++ echo 'THREADS       : 48'
++ echo 'BUSCO         : embryophyta_odb10'
++ echo ==============================
+++ date +%Y%m%d_%H%M%S
++ LOG=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026/braker3_H1_2026.trimmedRNA_prot.20260122_042803.log
++ singularity exec -B /g/data:/g/data -B /scratch:/scratch /g/data/xf3/zz3507/app/braker3.2026.sif braker.pl --genome=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/H1_2026_v1.top20.fa.masked --workingdir=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026 --prot_seq=/g/data/xf3/zz3507/RawData/OrchidProteins/merged_proteins_orchid.faa --rnaseq_sets_ids=129_S120,130_S121,131_S122,104C_S7,104L_S19,105C_S8,106C_S4,106L_S16,107C_S5,112c_S1,129L_S22,141L_S13,142C_S2,142L_S14,151C_S11,151L_S23,175C_S12,175L_S24,4_S17 --rnaseq_sets_dirs=/g/data/xf3/zz3507/RawData/ctrapeziformis_RNA/trimmed_chiloglottis --threads 48 --busco_lineage embryophyta_odb10 --useexisting
++ echo '[DONE] BRAKER finished. Log: /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/BRAKER3v3/H1_2026_v3_breaker2026/braker3_H1_2026.trimmedRNA_prot.20260122_042803.log'
