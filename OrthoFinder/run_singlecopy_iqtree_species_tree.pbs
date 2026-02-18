@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N OF_scIQT_2026
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=24:00:00
+#PBS -l mem=96GB
+#PBS -l ncpus=24
+#PBS -l jobfs=200GB
+#PBS -l storage=gdata/xf3
+#PBS -l wd
+#PBS -o /g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026/OrthoFinder/Results_Feb16/Species_Tree/singlecopy_iqtree_strict_20260218/pbs.o${PBS_JOBID}
+#PBS -e /g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026/OrthoFinder/Results_Feb16/Species_Tree/singlecopy_iqtree_strict_20260218/pbs.e${PBS_JOBID}
+
+set -euo pipefail
+
+SCRIPT="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/OrthoFinder/run_singlecopy_iqtree_species_tree.sh"
+OUTDIR="/g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026/OrthoFinder/Results_Feb16/Species_Tree/singlecopy_iqtree_strict_20260218"
+
+mkdir -p "$OUTDIR"
+
+bash "$SCRIPT" \
+  --dataset-dir /g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026 \
+  --n0-tsv /g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH12026/OrthoFinder/Results_Feb16/Phylogenetic_Hierarchical_Orthogroups/N0.tsv \
+  --outdir "$OUTDIR" \
+  --threads 24 \
+  --bootstrap 1000 \
+  --min-occupancy 1.0 \
+  --seed 20260218 \
+  --redo

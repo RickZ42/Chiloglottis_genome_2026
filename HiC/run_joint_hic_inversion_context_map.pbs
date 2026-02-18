@@ -20,7 +20,7 @@ export JAVA_XMX=120g
 
 bash "$SCRIPT" \
   --threads 48 \
-  --mapq 30 \
+  --mapq 0 \
   --bin-size 100000 \
   --flank-bp 3000000 \
   --min-inv-len 500000 \

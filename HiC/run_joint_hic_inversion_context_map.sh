@@ -3,14 +3,14 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Create publication-grade Hi-C inversion context maps using Juicer-compatible processing.
+Create publication-grade inter-haplotype Hi-C context maps using Juicer-compatible processing.
 
 This script:
 1) Builds a joint H1+H2 reference with prefixed chromosome IDs.
 2) Maps Hi-C reads with BWA-MEM (`-SP5M`) as in Juicer single-CPU workflow.
 3) Runs Juicer core text processing (`chimeric_blacklist.awk`, fragment assignment, `dups.awk`).
 4) Builds normalized `.hic` with `juicer_tools pre`.
-5) Extracts local windows with `juicer_tools dump observed` and plots standardized panels.
+5) Extracts local H1-vs-H2 windows with `juicer_tools dump observed` and plots standardized panels.
 
 Usage:
   bash run_joint_hic_inversion_context_map.sh [options]
@@ -23,7 +23,7 @@ Options:
   --r2 PATH                 Hi-C read2 FASTQ(.gz)
   --outdir PATH             output directory
   --threads INT             threads for BWA/sort (default: 32)
-  --mapq INT                MAPQ cutoff used by juicer_tools pre (default: 30)
+  --mapq INT                MAPQ cutoff used by juicer_tools pre (default: 0; equivalent to retaining all signals)
   --bin-size INT            matrix bin size in bp (default: 100000)
   --flank-bp INT            flank size around inversion in bp (default: 3000000)
   --min-inv-len INT         min inversion length to keep (default: 500000)
@@ -59,7 +59,7 @@ R2="/g/data/xf3/zz3507/RawData/ctrapeziformis_hic/trimmed_reads/40769_R2_001_val
 OUTDIR="/g/data/xf3/zz3507/Output/20260127Genome/hic_inv_context_joint"
 
 THREADS=32
-MAPQ=30
+MAPQ=0
 BIN_SIZE=100000
 FLANK_BP=3000000
 MIN_INV_LEN=500000
@@ -288,19 +288,19 @@ def parse_inv(path):
             })
     return out
 
-def run_dump(norm, chrom, start, end, outfile):
-    region = f"{chrom}:{start}:{end}"
+def run_dump(norm, region1, region2, outfile):
     cmd = [
         java_bin, "-Djava.awt.headless=true", f"-Xmx{java_xmx}", "-jar", juicer_jar,
         "dump", "observed", norm, hic_file,
-        region, region, "BP", str(bin_size), outfile,
+        region1, region2, "BP", str(bin_size), outfile,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     return proc.returncode, (proc.stderr or "").strip(), (proc.stdout or "").strip()
 
-def dense_from_dump(path, start, end):
-    nbin = int(math.ceil((end - start + 1) / float(bin_size)))
-    mat = np.zeros((nbin, nbin), dtype=np.float64)
+def dense_from_dump(path, h1_start, h1_end, h2_start, h2_end):
+    h1_bins = int(math.ceil((h1_end - h1_start + 1) / float(bin_size)))
+    h2_bins = int(math.ceil((h2_end - h2_start + 1) / float(bin_size)))
+    mat = np.zeros((h1_bins, h2_bins), dtype=np.float64)
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         return mat
     with open(path) as f:
@@ -316,33 +316,39 @@ def dense_from_dump(path, start, end):
                 v = float(c[2])
             except ValueError:
                 continue
-            i = int((x - start) // bin_size)
-            j = int((y - start) // bin_size)
-            if i < 0 or j < 0 or i >= nbin or j >= nbin:
+            if not math.isfinite(v):
+                continue
+            i = int((x - h1_start) // bin_size)
+            j = int((y - h2_start) // bin_size)
+            if i < 0 or j < 0 or i >= h1_bins or j >= h2_bins:
                 continue
             mat[i, j] += v
-            if i != j:
-                mat[j, i] += v
     return mat
 
-def plot_one(ax, mat, title, inv_start, inv_end, win_start, vmax):
-    im = ax.imshow(np.log1p(mat), origin="lower", cmap="Reds", interpolation="nearest", vmin=0.0, vmax=vmax)
-    sbin = (inv_start - win_start) / float(bin_size)
-    ebin = (inv_end - win_start) / float(bin_size)
-    for x in (sbin, ebin):
+def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h2_inv_start, h2_inv_end, h2_win_start, vmax):
+    im = ax.imshow(np.log1p(mat), origin="lower", cmap="Reds", interpolation="nearest", aspect="auto", vmin=0.0, vmax=vmax)
+    y1 = (h1_inv_start - h1_win_start) / float(bin_size)
+    y2 = (h1_inv_end - h1_win_start) / float(bin_size)
+    x1 = (h2_inv_start - h2_win_start) / float(bin_size)
+    x2 = (h2_inv_end - h2_win_start) / float(bin_size)
+    for x in (x1, x2):
         ax.axvline(x=x, color="deepskyblue", lw=1.1, ls="--")
-        ax.axhline(y=x, color="deepskyblue", lw=1.1, ls="--")
+    for y in (y1, y2):
+        ax.axhline(y=y, color="deepskyblue", lw=1.1, ls="--")
     ax.set_title(title, fontsize=9)
-    nbin = mat.shape[0]
-    if nbin > 1:
-        ticks = np.linspace(0, nbin - 1, 5)
-        labels = [f"{(win_start + t * bin_size) / 1e6:.1f}" for t in ticks]
-        ax.set_xticks(ticks)
-        ax.set_yticks(ticks)
-        ax.set_xticklabels(labels, fontsize=7)
-        ax.set_yticklabels(labels, fontsize=7)
-    ax.set_xlabel("Position (Mb)")
-    ax.set_ylabel("Position (Mb)")
+    nbin_y, nbin_x = mat.shape
+    if nbin_x > 1:
+        xticks = np.linspace(0, nbin_x - 1, 5)
+        xlabels = [f"{(h2_win_start + t * bin_size) / 1e6:.1f}" for t in xticks]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xlabels, fontsize=7)
+    if nbin_y > 1:
+        yticks = np.linspace(0, nbin_y - 1, 5)
+        ylabels = [f"{(h1_win_start + t * bin_size) / 1e6:.1f}" for t in yticks]
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(ylabels, fontsize=7)
+    ax.set_xlabel("H2 Position (Mb)")
+    ax.set_ylabel("H1 Position (Mb)")
     return im
 
 fai = load_fai(joint_fai)
@@ -373,52 +379,63 @@ all_logs = []
 
 for r in selected:
     inv_id = r["ID"]
-    for hap, chr_raw, s, e in (
-        ("H1", r["RefChr"], r["RefStart"], r["RefEnd"]),
-        ("H2", r["QryChr"], r["QryStart"], r["QryEnd"]),
-    ):
-        chrn = f"{hap}|{chr_raw}"
-        if chrn not in fai:
-            raise SystemExit(f"{chrn} not found in joint FAI.")
-        clen = fai[chrn]
-        a = max(1, min(s, e) - flank_bp)
-        b = min(clen, max(s, e) + flank_bp)
+    h1_chr = f"H1|{r['RefChr']}"
+    h2_chr = f"H2|{r['QryChr']}"
+    if h1_chr not in fai:
+        raise SystemExit(f"{h1_chr} not found in joint FAI.")
+    if h2_chr not in fai:
+        raise SystemExit(f"{h2_chr} not found in joint FAI.")
 
-        dump_tsv = os.path.join(dump_dir, f"{inv_id}.{hap}.{chr_raw}.{a}_{b}.{primary_norm}.tsv")
-        rc, err, _ = run_dump(primary_norm, chrn, a, b, dump_tsv)
-        used_norm = primary_norm
+    h1_start = max(1, min(r["RefStart"], r["RefEnd"]) - flank_bp)
+    h1_end = min(fai[h1_chr], max(r["RefStart"], r["RefEnd"]) + flank_bp)
+    h2_start = max(1, min(r["QryStart"], r["QryEnd"]) - flank_bp)
+    h2_end = min(fai[h2_chr], max(r["QryStart"], r["QryEnd"]) + flank_bp)
 
-        if rc != 0 and fallback_norm and fallback_norm != primary_norm:
-            dump_tsv = os.path.join(dump_dir, f"{inv_id}.{hap}.{chr_raw}.{a}_{b}.{fallback_norm}.tsv")
-            rc2, err2, _ = run_dump(fallback_norm, chrn, a, b, dump_tsv)
-            if rc2 == 0:
-                rc = 0
-                used_norm = fallback_norm
-                err = ""
-            else:
-                err = (err + "\n" + err2).strip()
+    reg1 = f"{h1_chr}:{h1_start}:{h1_end}"
+    reg2 = f"{h2_chr}:{h2_start}:{h2_end}"
 
-        if rc != 0:
-            raise SystemExit(
-                f"juicer_tools dump failed for {inv_id} {hap} {chrn}:{a}-{b}\n"
-                f"Primary={primary_norm} fallback={fallback_norm}\n{err}"
-            )
+    dump_tsv = os.path.join(dump_dir, f"{inv_id}.H1vsH2.{r['RefChr']}_{r['QryChr']}.{h1_start}_{h1_end}.{h2_start}_{h2_end}.{primary_norm}.tsv")
+    rc, err, _ = run_dump(primary_norm, reg1, reg2, dump_tsv)
+    used_norm = primary_norm
 
-        mat = dense_from_dump(dump_tsv, a, b)
-        mat_store[(inv_id, hap)] = {
-            "chr": chrn,
-            "start": a,
-            "end": b,
-            "inv_start": min(s, e),
-            "inv_end": max(s, e),
-            "norm": used_norm,
-            "dump_tsv": dump_tsv,
-            "mat": mat,
-        }
+    if rc != 0 and fallback_norm and fallback_norm != primary_norm:
+        dump_tsv = os.path.join(dump_dir, f"{inv_id}.H1vsH2.{r['RefChr']}_{r['QryChr']}.{h1_start}_{h1_end}.{h2_start}_{h2_end}.{fallback_norm}.tsv")
+        rc2, err2, _ = run_dump(fallback_norm, reg1, reg2, dump_tsv)
+        if rc2 == 0:
+            rc = 0
+            used_norm = fallback_norm
+            err = ""
+        else:
+            err = (err + "\n" + err2).strip()
 
-        nz = np.log1p(mat[mat > 0])
-        if nz.size:
-            all_logs.append(nz)
+    if rc != 0:
+        raise SystemExit(
+            f"juicer_tools dump failed for {inv_id} H1-vs-H2\n"
+            f"{reg1} x {reg2}\n"
+            f"Primary={primary_norm} fallback={fallback_norm}\n{err}"
+        )
+
+    mat = dense_from_dump(dump_tsv, h1_start, h1_end, h2_start, h2_end)
+    mat_store[inv_id] = {
+        "h1_chr": h1_chr,
+        "h2_chr": h2_chr,
+        "h1_start": h1_start,
+        "h1_end": h1_end,
+        "h2_start": h2_start,
+        "h2_end": h2_end,
+        "h1_inv_start": min(r["RefStart"], r["RefEnd"]),
+        "h1_inv_end": max(r["RefStart"], r["RefEnd"]),
+        "h2_inv_start": min(r["QryStart"], r["QryEnd"]),
+        "h2_inv_end": max(r["QryStart"], r["QryEnd"]),
+        "norm": used_norm,
+        "dump_tsv": dump_tsv,
+        "mat": mat,
+    }
+
+    finite_pos = np.isfinite(mat) & (mat > 0)
+    nz = np.log1p(mat[finite_pos])
+    if nz.size:
+        all_logs.append(nz)
 
 # global scale across all panels for standardized comparison
 if all_logs:
@@ -431,15 +448,17 @@ global_vmax = max(global_vmax, 1e-6)
 
 for r in selected:
     inv_id = r["ID"]
-    h1 = mat_store[(inv_id, "H1")]
-    h2 = mat_store[(inv_id, "H2")]
+    m = mat_store[inv_id]
     rows.append({
         "ID": inv_id,
         "RefChr": r["RefChr"], "RefStart": r["RefStart"], "RefEnd": r["RefEnd"], "RefLen": r["RefLen"],
         "QryChr": r["QryChr"], "QryStart": r["QryStart"], "QryEnd": r["QryEnd"], "QryLen": r["QryLen"],
         "MinLen": r["MinLen"],
-        "H1_window_start": h1["start"], "H1_window_end": h1["end"], "H1_contacts": int(h1["mat"].sum() // 2), "H1_norm": h1["norm"], "H1_dump": h1["dump_tsv"],
-        "H2_window_start": h2["start"], "H2_window_end": h2["end"], "H2_contacts": int(h2["mat"].sum() // 2), "H2_norm": h2["norm"], "H2_dump": h2["dump_tsv"],
+        "H1_window_start": m["h1_start"], "H1_window_end": m["h1_end"],
+        "H2_window_start": m["h2_start"], "H2_window_end": m["h2_end"],
+        "Inter_contacts": int(np.nansum(m["mat"])),
+        "Norm": m["norm"],
+        "Inter_dump": m["dump_tsv"],
         "hic_file": hic_file,
         "bin_size": bin_size,
         "flank_bp": flank_bp,
@@ -450,8 +469,9 @@ rows.sort(key=lambda x: x["MinLen"], reverse=True)
 header = [
     "ID", "RefChr", "RefStart", "RefEnd", "RefLen",
     "QryChr", "QryStart", "QryEnd", "QryLen", "MinLen",
-    "H1_window_start", "H1_window_end", "H1_contacts", "H1_norm", "H1_dump",
-    "H2_window_start", "H2_window_end", "H2_contacts", "H2_norm", "H2_dump",
+    "H1_window_start", "H1_window_end",
+    "H2_window_start", "H2_window_end",
+    "Inter_contacts", "Norm", "Inter_dump",
     "hic_file", "bin_size", "flank_bp",
 ]
 with open(summary_tsv, "w", newline="") as f:
@@ -463,35 +483,48 @@ with open(summary_tsv, "w", newline="") as f:
 # Save matrices
 for r in rows:
     inv_id = r["ID"]
-    h1 = mat_store[(inv_id, "H1")]
-    h2 = mat_store[(inv_id, "H2")]
+    m = mat_store[inv_id]
     np.savez_compressed(
         os.path.join(mat_dir, f"{inv_id}.hic_context.juicer.npz"),
-        H1=h1["mat"], H2=h2["mat"],
-        H1_chr=h1["chr"], H1_start=h1["start"], H1_end=h1["end"], H1_norm=h1["norm"],
-        H2_chr=h2["chr"], H2_start=h2["start"], H2_end=h2["end"], H2_norm=h2["norm"],
+        H1_vs_H2=m["mat"],
+        H1_chr=m["h1_chr"], H1_start=m["h1_start"], H1_end=m["h1_end"],
+        H2_chr=m["h2_chr"], H2_start=m["h2_start"], H2_end=m["h2_end"],
+        H1_inv_start=m["h1_inv_start"], H1_inv_end=m["h1_inv_end"],
+        H2_inv_start=m["h2_inv_start"], H2_inv_end=m["h2_inv_end"],
+        norm=m["norm"],
         bin_size=bin_size,
     )
 
 # Combined panel
 n = len(rows)
 fig_h = max(3.2 * n, 4.0)
-fig, axes = plt.subplots(nrows=n, ncols=2, figsize=(11, fig_h), constrained_layout=True)
+fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(7.5, fig_h), constrained_layout=True)
 if n == 1:
     axes = np.array([axes])
 
 for i, r in enumerate(rows):
     inv_id = r["ID"]
-    h1 = mat_store[(inv_id, "H1")]
-    h2 = mat_store[(inv_id, "H2")]
-    title1 = f"{inv_id} H1 {r['RefChr']}:{r['RefStart']}-{r['RefEnd']} ({h1['norm']})"
-    title2 = f"{inv_id} H2 {r['QryChr']}:{r['QryStart']}-{r['QryEnd']} ({h2['norm']})"
-    im = plot_one(axes[i, 0], h1["mat"], title1, r["RefStart"], r["RefEnd"], h1["start"], global_vmax)
-    plot_one(axes[i, 1], h2["mat"], title2, r["QryStart"], r["QryEnd"], h2["start"], global_vmax)
-    cb = fig.colorbar(im, ax=axes[i, :], fraction=0.02, pad=0.01)
+    m = mat_store[inv_id]
+    title = (
+        f"{inv_id}  H1 {r['RefChr']}:{r['RefStart']}-{r['RefEnd']}  vs  "
+        f"H2 {r['QryChr']}:{r['QryStart']}-{r['QryEnd']} ({m['norm']})"
+    )
+    im = plot_inter(
+        axes[i],
+        m["mat"],
+        title,
+        m["h1_inv_start"],
+        m["h1_inv_end"],
+        m["h1_start"],
+        m["h2_inv_start"],
+        m["h2_inv_end"],
+        m["h2_start"],
+        global_vmax,
+    )
+    cb = fig.colorbar(im, ax=axes[i], fraction=0.03, pad=0.02)
     cb.set_label("log1p(normalized contact)")
 
-fig.suptitle("Hi-C inversion context maps (Juicer standardized normalization)", fontsize=12)
+fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=12)
 fig.savefig(panel_png, dpi=400)
 fig.savefig(panel_pdf)
 plt.close(fig)
@@ -499,12 +532,21 @@ plt.close(fig)
 # Per inversion panels
 for r in rows:
     inv_id = r["ID"]
-    h1 = mat_store[(inv_id, "H1")]
-    h2 = mat_store[(inv_id, "H2")]
-    fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.2), constrained_layout=True)
-    im = plot_one(ax[0], h1["mat"], f"{inv_id} H1 {r['RefChr']} ({h1['norm']})", r["RefStart"], r["RefEnd"], h1["start"], global_vmax)
-    plot_one(ax[1], h2["mat"], f"{inv_id} H2 {r['QryChr']} ({h2['norm']})", r["QryStart"], r["QryEnd"], h2["start"], global_vmax)
-    cb = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
+    m = mat_store[inv_id]
+    fig, ax = plt.subplots(1, 1, figsize=(6.8, 5.0), constrained_layout=True)
+    im = plot_inter(
+        ax,
+        m["mat"],
+        f"{inv_id} H1 {r['RefChr']} vs H2 {r['QryChr']} ({m['norm']})",
+        m["h1_inv_start"],
+        m["h1_inv_end"],
+        m["h1_start"],
+        m["h2_inv_start"],
+        m["h2_inv_end"],
+        m["h2_start"],
+        global_vmax,
+    )
+    cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
     cb.set_label("log1p(normalized contact)")
     fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400)
     fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"))
