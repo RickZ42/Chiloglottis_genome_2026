@@ -326,25 +326,43 @@ def dense_from_dump(path, h1_start, h1_end, h2_start, h2_end):
     return mat
 
 def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h2_inv_start, h2_inv_end, h2_win_start, vmax):
-    im = ax.imshow(np.log1p(mat), origin="lower", cmap="Reds", interpolation="nearest", aspect="auto", vmin=0.0, vmax=vmax)
-    y1 = (h1_inv_start - h1_win_start) / float(bin_size)
-    y2 = (h1_inv_end - h1_win_start) / float(bin_size)
-    x1 = (h2_inv_start - h2_win_start) / float(bin_size)
-    x2 = (h2_inv_end - h2_win_start) / float(bin_size)
+    # Enforce same x/y scale and center the matrix in a square plotting canvas.
+    nbin_y, nbin_x = mat.shape
+    n_common = max(1, max(nbin_y, nbin_x))
+    x_off = 0.5 * (n_common - nbin_x)
+    y_off = 0.5 * (n_common - nbin_y)
+
+    im = ax.imshow(
+        np.log1p(mat),
+        origin="lower",
+        cmap="Reds",
+        interpolation="nearest",
+        aspect="equal",
+        vmin=0.0,
+        vmax=vmax,
+        extent=(x_off - 0.5, x_off + nbin_x - 0.5, y_off - 0.5, y_off + nbin_y - 0.5),
+    )
+    y1 = (h1_inv_start - h1_win_start) / float(bin_size) + y_off
+    y2 = (h1_inv_end - h1_win_start) / float(bin_size) + y_off
+    x1 = (h2_inv_start - h2_win_start) / float(bin_size) + x_off
+    x2 = (h2_inv_end - h2_win_start) / float(bin_size) + x_off
     for x in (x1, x2):
         ax.axvline(x=x, color="deepskyblue", lw=1.1, ls="--")
     for y in (y1, y2):
         ax.axhline(y=y, color="deepskyblue", lw=1.1, ls="--")
-    ax.set_title(title, fontsize=9)
-    nbin_y, nbin_x = mat.shape
+    ax.set_title(title, fontsize=9, pad=10)
+    ax.set_xlim(-0.5, n_common - 0.5)
+    ax.set_ylim(-0.5, n_common - 0.5)
+    ax.set_anchor("C")
+
     if nbin_x > 1:
-        xticks = np.linspace(0, nbin_x - 1, 5)
-        xlabels = [f"{(h2_win_start + t * bin_size) / 1e6:.1f}" for t in xticks]
+        xticks = np.linspace(x_off, x_off + nbin_x - 1, 5)
+        xlabels = [f"{(h2_win_start + t * bin_size) / 1e6:.1f}" for t in np.linspace(0, nbin_x - 1, 5)]
         ax.set_xticks(xticks)
         ax.set_xticklabels(xlabels, fontsize=7)
     if nbin_y > 1:
-        yticks = np.linspace(0, nbin_y - 1, 5)
-        ylabels = [f"{(h1_win_start + t * bin_size) / 1e6:.1f}" for t in yticks]
+        yticks = np.linspace(y_off, y_off + nbin_y - 1, 5)
+        ylabels = [f"{(h1_win_start + t * bin_size) / 1e6:.1f}" for t in np.linspace(0, nbin_y - 1, 5)]
         ax.set_yticks(yticks)
         ax.set_yticklabels(ylabels, fontsize=7)
     ax.set_xlabel("H2 Position (Mb)")
@@ -497,8 +515,8 @@ for r in rows:
 
 # Combined panel
 n = len(rows)
-fig_h = max(3.2 * n, 4.0)
-fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(7.5, fig_h), constrained_layout=True)
+fig_h = max(7.0 * n + 2.0, 12.0)
+fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(19.0, fig_h), constrained_layout=False)
 if n == 1:
     axes = np.array([axes])
 
@@ -521,19 +539,20 @@ for i, r in enumerate(rows):
         m["h2_start"],
         global_vmax,
     )
-    cb = fig.colorbar(im, ax=axes[i], fraction=0.03, pad=0.02)
+    cb = fig.colorbar(im, ax=axes[i], fraction=0.025, pad=0.02)
     cb.set_label("log1p(normalized contact)")
 
-fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=12)
-fig.savefig(panel_png, dpi=400)
-fig.savefig(panel_pdf)
+fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=13, y=0.99)
+fig.subplots_adjust(left=0.07, right=0.90, top=0.93, bottom=0.05, hspace=0.72)
+fig.savefig(panel_png, dpi=400, bbox_inches="tight", pad_inches=0.25)
+fig.savefig(panel_pdf, bbox_inches="tight", pad_inches=0.25)
 plt.close(fig)
 
 # Per inversion panels
 for r in rows:
     inv_id = r["ID"]
     m = mat_store[inv_id]
-    fig, ax = plt.subplots(1, 1, figsize=(6.8, 5.0), constrained_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=(13.5, 10.0), constrained_layout=False)
     im = plot_inter(
         ax,
         m["mat"],
@@ -548,8 +567,9 @@ for r in rows:
     )
     cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
     cb.set_label("log1p(normalized contact)")
-    fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400)
-    fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"))
+    fig.subplots_adjust(left=0.09, right=0.89, top=0.90, bottom=0.10)
+    fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400, bbox_inches="tight", pad_inches=0.25)
+    fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"), bbox_inches="tight", pad_inches=0.25)
     plt.close(fig)
 
 print(f"[INFO] wrote summary: {summary_tsv}", file=sys.stderr)
