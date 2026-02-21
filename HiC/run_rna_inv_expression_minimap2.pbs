@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -N rnaINV_mm2_2026
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l mem=192GB
+#PBS -l ncpus=48
+#PBS -l jobfs=400GB
+#PBS -l storage=gdata/xf3+gdata/if89
+#PBS -l wd
+#PBS -o /g/data/xf3/zz3507/Output/20260127Genome/H1/inversion_rna_minimap2/log/rna_inv_mm2.o${PBS_JOBID}
+#PBS -e /g/data/xf3/zz3507/Output/20260127Genome/H1/inversion_rna_minimap2/log/rna_inv_mm2.e${PBS_JOBID}
+
+set -euo pipefail
+
+SCRIPT="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/HiC/run_rna_inv_expression_minimap2.sh"
+OUTDIR="/g/data/xf3/zz3507/Output/20260127Genome/H1/inversion_rna_minimap2"
+
+mkdir -p "${OUTDIR}/log"
+
+# If featureCounts is not in PATH on compute nodes, set this to a full path:
+# FEATURECOUNTS_BIN="/path/to/featureCounts"
+FEATURECOUNTS_ARG=()
+if [[ -n "${FEATURECOUNTS_BIN:-}" ]]; then
+  FEATURECOUNTS_ARG=(--featurecounts "$FEATURECOUNTS_BIN")
+fi
+
+bash "$SCRIPT" \
+  --outdir "$OUTDIR" \
+  --threads 48 \
+  --mm2-preset splice \
+  "${FEATURECOUNTS_ARG[@]}"
+
+# Example (reuse existing counts table, skip counting):
+# bash "$SCRIPT" \
+#   --outdir "$OUTDIR" \
+#   --threads 48 \
+#   --skip-counts \
+#   --counts-tsv /g/data/xf3/zz3507/Output/TamdemGeneExpression/outputNov19/gene_expression_counts_H1_all.txt
