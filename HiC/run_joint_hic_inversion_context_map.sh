@@ -513,14 +513,18 @@ for r in rows:
         bin_size=bin_size,
     )
 
-# Combined panel
-n = len(rows)
+# Combined panel (cap panel count to keep figure tractable for large candidate sets)
+n_total = len(rows)
+combined_max = 20
+panel_rows = rows[:combined_max]
+n = len(panel_rows)
+
 fig_h = max(7.0 * n + 2.0, 12.0)
 fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(19.0, fig_h), constrained_layout=False)
 if n == 1:
     axes = np.array([axes])
 
-for i, r in enumerate(rows):
+for i, r in enumerate(panel_rows):
     inv_id = r["ID"]
     m = mat_store[inv_id]
     title = (
@@ -542,7 +546,14 @@ for i, r in enumerate(rows):
     cb = fig.colorbar(im, ax=axes[i], fraction=0.025, pad=0.02)
     cb.set_label("log1p(normalized contact)")
 
-fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=13, y=0.99)
+if n_total > n:
+    fig.suptitle(
+        f"Inter-haplotype Hi-C context maps (first {n} of {n_total}; H1 window vs H2 window)",
+        fontsize=13,
+        y=0.99,
+    )
+else:
+    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=13, y=0.99)
 fig.subplots_adjust(left=0.07, right=0.90, top=0.93, bottom=0.05, hspace=0.72)
 fig.savefig(panel_png, dpi=400, bbox_inches="tight", pad_inches=0.25)
 fig.savefig(panel_pdf, bbox_inches="tight", pad_inches=0.25)
