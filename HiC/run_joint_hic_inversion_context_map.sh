@@ -155,9 +155,13 @@ if [[ ! -s "$JOINT_FAI" || "$FORCE_REBUILD" -eq 1 ]]; then
 fi
 awk 'BEGIN{OFS="\t"}{print $1,$2}' "$JOINT_FAI" > "$CHROM_SIZES"
 
-if [[ ! -s "${JOINT_FA}.bwt" || ! -s "${JOINT_FA}.sa" || "$FORCE_REBUILD" -eq 1 ]]; then
-  echo "[INFO] bwa index"
-  "$BWA" index "$JOINT_FA"
+if [[ "$SKIP_JUICER_CORE" -eq 0 ]]; then
+  if [[ ! -s "${JOINT_FA}.bwt" || ! -s "${JOINT_FA}.sa" || "$FORCE_REBUILD" -eq 1 ]]; then
+    echo "[INFO] bwa index"
+    "$BWA" index "$JOINT_FA"
+  fi
+else
+  echo "[INFO] --skip-juicer-core: skip bwa index"
 fi
 
 JUICER_CORE_DIR="$OUTDIR/juicer_core"
