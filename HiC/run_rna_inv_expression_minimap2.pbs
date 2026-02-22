@@ -18,8 +18,8 @@ OUTDIR="/g/data/xf3/zz3507/Output/20260127Genome/H1/inversion_rna_minimap2"
 
 mkdir -p "${OUTDIR}/log"
 
-# If featureCounts is not in PATH on compute nodes, set this to a full path:
-# FEATURECOUNTS_BIN="/path/to/featureCounts"
+# Installed locally via conda (subread)
+FEATURECOUNTS_BIN="/g/data/xf3/miniconda/envs/featurecounts/bin/featureCounts"
 FEATURECOUNTS_ARG=()
 if [[ -n "${FEATURECOUNTS_BIN:-}" ]]; then
   FEATURECOUNTS_ARG=(--featurecounts "$FEATURECOUNTS_BIN")
@@ -28,6 +28,7 @@ fi
 bash "$SCRIPT" \
   --outdir "$OUTDIR" \
   --threads 48 \
+  --skip-align \
   --mm2-preset splice \
   "${FEATURECOUNTS_ARG[@]}"
 
@@ -35,5 +36,6 @@ bash "$SCRIPT" \
 # bash "$SCRIPT" \
 #   --outdir "$OUTDIR" \
 #   --threads 48 \
+#   --skip-align \
 #   --skip-counts \
 #   --counts-tsv /g/data/xf3/zz3507/Output/TamdemGeneExpression/outputNov19/gene_expression_counts_H1_all.txt

@@ -177,8 +177,16 @@ if [[ $SKIP_COUNTS -eq 0 ]]; then
       exit 1
     }
   fi
-  echo "[INFO] Running featureCounts"
-  "$FEATURECOUNTS" -T "$THREADS" -a "$ANNOT_GTF" -o "$COUNTS_TSV" -p "${BAMS[@]}"
+  # Auto-detect whether BAMs retain paired-end FLAGs; minimap2 splice output in this
+  # workflow may not mark records as paired, which breaks `featureCounts -p`.
+  pe_flag_count="$("$SAMTOOLS" view -c -f 1 "${BAMS[0]}" | tr -d '[:space:]')"
+  if [[ "${pe_flag_count:-0}" =~ ^[0-9]+$ ]] && [[ "$pe_flag_count" -gt 0 ]]; then
+    echo "[INFO] Running featureCounts in paired-end mode (-p)"
+    "$FEATURECOUNTS" -T "$THREADS" -a "$ANNOT_GTF" -o "$COUNTS_TSV" -p "${BAMS[@]}"
+  else
+    echo "[WARN] No paired-end FLAGs detected in BAMs; running featureCounts without -p (single-end counting mode)."
+    "$FEATURECOUNTS" -T "$THREADS" -a "$ANNOT_GTF" -o "$COUNTS_TSV" "${BAMS[@]}"
+  fi
 else
   [[ -s "$COUNTS_TSV" ]] || { echo "ERROR: --skip-counts set but missing $COUNTS_TSV" >&2; exit 1; }
   echo "[INFO] Reuse counts: $COUNTS_TSV"
