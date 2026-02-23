@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -N H2_OF_msa
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=72:00:00
+#PBS -l mem=220GB
+#PBS -l ncpus=48
+#PBS -l jobfs=500GB
+#PBS -l storage=gdata/xf3
+#PBS -l wd
+
+set -euo pipefail
+
+ORTHOFINDER="/g/data/xf3/miniconda/envs/orthofinder/bin/orthofinder"
+DATASET_DIR="/g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH22026"
+
+# Use only if protein inputs changed. Current Results_Feb15 already shows an -M msa run on 2026-02-15.
+"$ORTHOFINDER" \
+  -f "$DATASET_DIR" \
+  -t 40 \
+  -a 8 \
+  -I 1.3 \
+  -M msa

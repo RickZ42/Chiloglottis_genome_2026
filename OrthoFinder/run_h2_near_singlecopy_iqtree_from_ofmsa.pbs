@@ -1,0 +1,33 @@
+#!/bin/bash
+#PBS -N H2_nearSC_IQT
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l mem=160GB
+#PBS -l ncpus=32
+#PBS -l jobfs=300GB
+#PBS -l storage=gdata/xf3
+#PBS -l wd
+
+set -euo pipefail
+
+SCRIPT="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/OrthoFinder/run_near_singlecopy_iqtree_from_orthofinder_msa.sh"
+RESULTS_DIR="/g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH22026/OrthoFinder/Results_Feb15"
+OUTDIR="${RESULTS_DIR}/Species_Tree/near_singlecopy_iqtree_occ080_c2_m4_20260223"
+REF_TREE="/g/data/xf3/zz3507/database/GeneFamilyExpentionContractionDatasetH22026/OrthoFinder/Results_Feb16/Species_Tree/SpeciesTree_rooted_node_labels.txt"
+
+mkdir -p "$OUTDIR"
+
+bash "$SCRIPT" \
+  --results-dir "$RESULTS_DIR" \
+  --outdir "$OUTDIR" \
+  --min-occupancy 0.8 \
+  --max-copy 2 \
+  --max-multicopy-species 4 \
+  --drop-all-gap-cols \
+  --threads 32 \
+  --bootstrap 1000 \
+  --alrt 1000 \
+  --seed 20260223 \
+  --compare-tree "$REF_TREE" \
+  --redo
