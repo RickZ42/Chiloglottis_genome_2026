@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N complasmOrch12
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l mem=120GB
+#PBS -l ncpus=32
+#PBS -l jobfs=200GB
+#PBS -l storage=gdata/xf3
+#PBS -l wd
+#PBS -o /g/data/xf3/zz3507/Output/20260127Genome/compleasm_orchidoideae_odb12/compleasm_orch12.o${PBS_JOBID}
+#PBS -e /g/data/xf3/zz3507/Output/20260127Genome/compleasm_orchidoideae_odb12/compleasm_orch12.e${PBS_JOBID}
+
+set -euo pipefail
+
+mkdir -p /g/data/xf3/zz3507/Output/20260127Genome/compleasm_orchidoideae_odb12
+
+bash /g/data/xf3/zz3507/script/Chiloglottis_genome_2026/compleasm/run_orchidoideae_compleasm_odb12.sh
+

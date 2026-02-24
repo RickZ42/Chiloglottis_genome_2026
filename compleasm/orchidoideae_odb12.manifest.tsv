@@ -1,0 +1,7 @@
+label	fasta
+Chiloglottis_H1	Output/20260127Genome/H1/H1_20260127.FINAL.top20.fa
+Chiloglottis_H2	Output/20260127Genome/H2/H2_20260127.FINAL.top20.ordered.renamed.fa
+Anoectochilus_roxburghii_HapA	database/ophrys/Aroxb_Xu2025_diploid_better/JXL_HapA_genome.fa
+Ophrys_sphegodes	database/ophrys/Osph-v2.3.fa
+Platanthera_zijinensis	database/OtherOrchidGenome/PlatantheraZijinensis/data/GCA_039513925.1/GCA_039513925.1_PZIJ_v1.0_genomic.fna
+Dactylorhiza_incarnata	database/OtherOrchidGenome/DactylorhizaIncarnata/ncbi_dataset/data/GCA_033032865.1/GCA_033032865.1_UVIE_Dinc_1.0_genomic.fna
