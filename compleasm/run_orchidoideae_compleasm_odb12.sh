@@ -6,12 +6,14 @@ OUT_BASE="${OUT_BASE:-${ROOT}/Output/20260127Genome/compleasm_orchidoideae_odb12
 LINEAGE_NAME="${LINEAGE_NAME:-embryophyta_odb12}"
 LINEAGE_ROOT="${LINEAGE_ROOT:-${ROOT}/database/busco_downloads/lineages}"
 COMPLEASM_BIN="${COMPLEASM_BIN:-${ROOT}/script/Chiloglottis_genome_2026/compleasm/bin/compleasm_v027}"
+MINIPROT_BIN="${MINIPROT_BIN:-/g/data/xf3/miniconda/envs/compleasm/bin/miniprot}"
+HMMSEARCH_BIN="${HMMSEARCH_BIN:-/g/data/xf3/miniconda/envs/compleasm/bin/hmmsearch}"
 THREADS="${THREADS:-${PBS_NCPUS:-16}}"
 MANIFEST="${MANIFEST:-${ROOT}/script/Chiloglottis_genome_2026/compleasm/orchidoideae_odb12.manifest.tsv}"
 COMPLEASM_DB_WORKROOT="${COMPLEASM_DB_WORKROOT:-${OUT_BASE}/offline_mb_downloads}"
 COMPLEASM_VERSION_STR=""
 
-export PATH="$(dirname "${COMPLEASM_BIN}"):${PATH}"
+export PATH="$(dirname "${COMPLEASM_BIN}"):$(dirname "${MINIPROT_BIN}"):$(dirname "${HMMSEARCH_BIN}"):${PATH}"
 
 mkdir -p "${OUT_BASE}/runs" "${OUT_BASE}/logs"
 
@@ -25,6 +27,14 @@ if [[ ! -d "${LINEAGE_ROOT}/${LINEAGE_NAME}" ]]; then
 fi
 if [[ ! -f "${MANIFEST}" ]]; then
   echo "ERROR: manifest not found: ${MANIFEST}" >&2
+  exit 1
+fi
+if [[ ! -x "${MINIPROT_BIN}" ]]; then
+  echo "ERROR: miniprot not executable: ${MINIPROT_BIN}" >&2
+  exit 1
+fi
+if [[ ! -x "${HMMSEARCH_BIN}" ]]; then
+  echo "ERROR: hmmsearch not executable: ${HMMSEARCH_BIN}" >&2
   exit 1
 fi
 
@@ -93,6 +103,8 @@ echo "[$(date)] compleasm version: ${COMPLEASM_VERSION_STR}"
 echo "[$(date)] Output base: ${OUT_BASE}"
 echo "[$(date)] Manifest: ${MANIFEST}"
 echo "[$(date)] Lineage: ${LINEAGE_NAME} (${LINEAGE_ROOT})"
+echo "[$(date)] miniprot: ${MINIPROT_BIN}"
+echo "[$(date)] hmmsearch: ${HMMSEARCH_BIN}"
 echo "[$(date)] Threads: ${THREADS}"
 
 prepare_compleasm_offline_db
@@ -146,6 +158,7 @@ while IFS=$'\t' read -r label fasta_rel; do
   fasta="${ROOT}/${fasta_rel}"
   run_dir="${OUT_BASE}/runs/${label}"
   full_table="${run_dir}/full_table.tsv"
+  full_table_nested="${run_dir}/${LINEAGE_NAME}/full_table.tsv"
   log_file="${OUT_BASE}/logs/${label}.compleasm.log"
 
   echo "[$(date)] ===== ${label} ====="
@@ -158,7 +171,7 @@ while IFS=$'\t' read -r label fasta_rel; do
     continue
   fi
 
-  if [[ -f "${full_table}" ]]; then
+  if [[ -f "${full_table}" || -f "${full_table_nested}" ]]; then
     echo "[$(date)] Reusing existing compleasm output: ${run_dir}" | tee -a "${log_file}"
   else
     rm -rf "${run_dir}"
@@ -170,15 +183,19 @@ while IFS=$'\t' read -r label fasta_rel; do
         -o "${run_dir}" \
         -l "${LINEAGE_NAME}" \
         -L "${COMPLEASM_DB_WORKROOT}" \
-        -t "${THREADS}"
+        -t "${THREADS}" \
+        --miniprot_execute_path "${MINIPROT_BIN}" \
+        --hmmsearch_execute_path "${HMMSEARCH_BIN}"
       echo "[$(date)] compleasm finished for ${label}"
     } 2>&1 | tee "${log_file}"
   fi
 
   if [[ -f "${full_table}" ]]; then
     parse_full_table "${full_table}" "${label}" "${fasta_rel}" "${run_dir}" >> "${SUMMARY_TSV}"
+  elif [[ -f "${full_table_nested}" ]]; then
+    parse_full_table "${full_table_nested}" "${label}" "${fasta_rel}" "${run_dir}" >> "${SUMMARY_TSV}"
   else
-    echo "[$(date)] ERROR: expected ${full_table} not found" | tee -a "${log_file}"
+    echo "[$(date)] ERROR: expected ${full_table} or ${full_table_nested} not found" | tee -a "${log_file}"
     printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tno_full_table\n" \
       "${label}" "${fasta_rel}" "${LINEAGE_NAME}" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "NA" "${run_dir}" >> "${SUMMARY_TSV}"
   fi
