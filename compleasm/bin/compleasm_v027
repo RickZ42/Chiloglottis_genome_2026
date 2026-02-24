@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euo pipefail
+
+PY="/g/data/xf3/miniconda/envs/compleasm/bin/python"
+SRC="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/compleasm/vendor/compleasm_v0.2.7/compleasm.py"
+
+exec "${PY}" "${SRC}" "$@"
+
