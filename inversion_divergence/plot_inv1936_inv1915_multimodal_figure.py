@@ -36,8 +36,9 @@ def parse_args():
     p.add_argument("--h2-func", default="Output/20260127Genome/functional_annotation/H2.Functional_Annotation_results.txt")
     p.add_argument("--outdir", default="Output/20260127Genome/inversion_pubfig_INV1936_INV1915")
     p.add_argument("--prefix", default="INV1936_INV1915_multimodal_pubfig")
-    p.add_argument("--gene-flank-max", type=int, default=500000)
-    p.add_argument("--gene-flank-min", type=int, default=250000)
+    # Keep only compact context around inversion core so flanks are visible but not dominant.
+    p.add_argument("--gene-flank-max", type=int, default=300000)
+    p.add_argument("--gene-flank-min", type=int, default=150000)
     return p.parse_args()
 
 
@@ -300,7 +301,7 @@ def build_gene_window(inv_row, flank_min, flank_max):
     ref_len = abs(int(inv_row['RefEnd']) - int(inv_row['RefStart'])) + 1
     qry_len = abs(int(inv_row['QryEnd']) - int(inv_row['QryStart'])) + 1
     min_len = min(ref_len, qry_len)
-    flank = int(min(flank_max, max(flank_min, round(min_len * 0.2))))
+    flank = int(min(flank_max, max(flank_min, round(min_len * 0.12))))
     return {
         'H1_start': max(1, int(inv_row['RefStart']) - flank),
         'H1_end': int(inv_row['RefEnd']) + flank,
@@ -330,14 +331,14 @@ def _draw_axis_ticks_text(ax, window_start, window_end, y, where='below', n=5, f
 
 def draw_overview_track(ax, transcripts, window_start, window_end, inv_start, inv_end,
                         hap_label, color_tick, color_density, y0, y1):
-    ax.add_patch(patches.Rectangle((0, y0), 1, y1-y0, facecolor='white', edgecolor='#d9d9d9', lw=0.6, zorder=0))
+    ax.add_patch(patches.Rectangle((0, y0), 1, y1-y0, facecolor='#f7f7f7', edgecolor='#d9d9d9', lw=0.6, zorder=0))
     x_inv1 = norm_pos(inv_start, window_start, window_end)
     x_inv2 = norm_pos(inv_end, window_start, window_end)
     xlo, xhi = sorted([x_inv1, x_inv2])
     ax.add_patch(patches.Rectangle((xlo, y0), max(1e-6, xhi-xlo), y1-y0,
-                                   facecolor='#fde8e7', edgecolor='none', alpha=0.95, zorder=0.2))
+                                   facecolor='#fff2b2', edgecolor='none', alpha=0.98, zorder=0.2))
     for xv in (xlo, xhi):
-        ax.plot([xv, xv], [y0, y1], color='#cf3f3f', lw=0.8, ls='--', zorder=1)
+        ax.plot([xv, xv], [y0, y1], color='#b44a12', lw=0.9, ls='--', zorder=1)
 
     ax.text(-0.015, (y0+y1)/2, hap_label, ha='right', va='center', fontsize=8, fontweight='bold', transform=ax.transAxes)
     if transcripts.empty:
@@ -371,13 +372,13 @@ def draw_overview_track(ax, transcripts, window_start, window_end, inv_start, in
 def draw_zoom_gene_track(ax, transcripts, window_start, window_end, inv_start, inv_end,
                          overlap_roots, anchor_roots, hap_label, color_main, color_anchor, color_bg,
                          y0, y1, label_roots=None, label_above=True):
-    ax.add_patch(patches.Rectangle((0, y0), 1, y1-y0, facecolor='white', edgecolor='#d9d9d9', lw=0.6, zorder=0))
+    ax.add_patch(patches.Rectangle((0, y0), 1, y1-y0, facecolor='#f2f2f2', edgecolor='#d9d9d9', lw=0.6, zorder=0))
     x_inv1 = norm_pos(inv_start, window_start, window_end)
     x_inv2 = norm_pos(inv_end, window_start, window_end)
     xlo, xhi = sorted([x_inv1, x_inv2])
-    ax.add_patch(patches.Rectangle((xlo, y0), max(1e-6, xhi-xlo), y1-y0, facecolor='#fde8e7', edgecolor='none', alpha=0.98, zorder=0.2))
+    ax.add_patch(patches.Rectangle((xlo, y0), max(1e-6, xhi-xlo), y1-y0, facecolor='#fff2b2', edgecolor='none', alpha=0.98, zorder=0.2))
     for xv in (xlo, xhi):
-        ax.plot([xv, xv], [y0, y1], color='#cf3f3f', lw=0.8, ls='--', zorder=1.5)
+        ax.plot([xv, xv], [y0, y1], color='#b44a12', lw=0.9, ls='--', zorder=1.5)
 
     ax.text(-0.015, (y0+y1)/2, hap_label, ha='right', va='center', fontsize=8, fontweight='bold', transform=ax.transAxes)
     if transcripts.empty:
@@ -405,7 +406,7 @@ def draw_zoom_gene_track(ax, transcripts, window_start, window_end, inv_start, i
         is_overlap = gene in overlap_roots
         is_anchor = gene in anchor_roots
         fc = color_bg
-        ec = '#b5b5b5'
+        ec = '#9f9f9f'
         alpha = 0.55
         lw = 0.35
         z = 2.0
@@ -454,11 +455,14 @@ def draw_zoom_gene_track(ax, transcripts, window_start, window_end, inv_start, i
     return centers
 
 
-def draw_anchor_ribbons(ax, pairs_df, h1_pos, h2_pos, h1w1, h1w2, h2w1, h2w2, y_top, y_bottom):
+def draw_anchor_ribbons(ax, pairs_df, h1_pos, h2_pos, h1w1, h1w2, h2w1, h2w2, y_top, y_bottom,
+                        h1_overlap_set, h2_overlap_set):
     ax.add_patch(patches.Rectangle((0, y_bottom), 1, y_top-y_bottom, facecolor='white', edgecolor='none', zorder=0))
     if pairs_df.empty:
-        return 0
+        return 0, 0, 0
     n = 0
+    n_inv = 0
+    n_flank = 0
     for _, r in pairs_df.iterrows():
         h1_root = re.sub(r'\.t\d+$', '', str(r['H1_gene']))
         h2_root = re.sub(r'\.t\d+$', '', str(r['H2_gene']))
@@ -471,8 +475,16 @@ def draw_anchor_ribbons(ax, pairs_df, h1_pos, h2_pos, h1w1, h1w2, h2w1, h2w2, y_
         x2 = norm_pos((h2r['Start'] + h2r['End'])/2, h2w1, h2w2)
         same_strand = (h1r['Strand'] == h2r['Strand'])
         aa_id = pd.to_numeric(r.get('aa_identity', np.nan), errors='coerce') if hasattr(pd, 'to_numeric') else np.nan
-        lw = 0.9 if not np.isfinite(aa_id) else (0.8 + 1.6 * max(0.0, min(1.0, float(aa_id) - 0.97) / 0.03))
-        color = '#2a9d8f' if same_strand else '#e76f51'
+        in_inv = (h1_root in h1_overlap_set) and (h2_root in h2_overlap_set)
+        if in_inv:
+            n_inv += 1
+        else:
+            n_flank += 1
+        lw = 1.45 if in_inv else 0.75
+        if np.isfinite(aa_id):
+            lw += 0.55 * max(0.0, min(1.0, float(aa_id) - 0.97) / 0.03)
+        color = '#67a9ff' if in_inv else '#b8bdc7'
+        ls = '-' if same_strand else (0, (2.0, 1.4))
         verts = [
             (x1, y_top),
             (x1, (y_top+y_bottom)/2 + 0.04),
@@ -480,8 +492,9 @@ def draw_anchor_ribbons(ax, pairs_df, h1_pos, h2_pos, h1w1, h1w2, h2w1, h2w2, y_
             (x2, y_bottom),
         ]
         codes = [MplPath.MOVETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4]
-        ax.add_patch(PathPatch(MplPath(verts, codes), facecolor='none', edgecolor=color, lw=lw, alpha=0.7, zorder=1.5))
-    return n
+        ax.add_patch(PathPatch(MplPath(verts, codes), facecolor='none', edgecolor=color, lw=lw,
+                               ls=ls, alpha=0.84 if in_inv else 0.72, zorder=1.5 if in_inv else 1.2))
+    return n, n_inv, n_flank
 
 
 def draw_synteny_panel(ax, inv_id, inv_row, gene_windows, h1_tx_all, h2_tx_all, h1_tx_t1, h2_tx_t1, pairs_df):
@@ -512,8 +525,8 @@ def draw_synteny_panel(ax, inv_id, inv_row, gene_windows, h1_tx_all, h2_tx_all, 
         anchor_roots_h2.add(re.sub(r'\.t\d+$', '', str(r['H2_gene'])))
 
     # Zoom windows (paper-style: detailed view centered on inversion with smaller flank)
-    zoom_flank_h1 = int(min(200_000, max(50_000, 0.10 * abs(h1i2 - h1i1 + 1))))
-    zoom_flank_h2 = int(min(200_000, max(50_000, 0.10 * abs(h2i2 - h2i1 + 1))))
+    zoom_flank_h1 = int(min(120_000, max(30_000, 0.08 * abs(h1i2 - h1i1 + 1))))
+    zoom_flank_h2 = int(min(120_000, max(30_000, 0.08 * abs(h2i2 - h2i1 + 1))))
     h1z1 = max(1, min(h1i1, h1i2) - zoom_flank_h1)
     h1z2 = max(h1i1, h1i2) + zoom_flank_h1
     h2z1 = max(1, min(h2i1, h2i2) - zoom_flank_h2)
@@ -562,18 +575,36 @@ def draw_synteny_panel(ax, inv_id, inv_row, gene_windows, h1_tx_all, h2_tx_all, 
 
     draw_zoom_gene_track(
         ax, h1_zoom, h1z1, h1z2, h1i1, h1i2,
-        h1_overlap, anchor_roots_h1, 'H1', '#2f6fab', '#174f8a', '#cfd9e8',
+        h1_overlap, anchor_roots_h1, 'H1', '#2f6fab', '#174f8a', '#d2d2d2',
         y0=y_zoom_h1[0], y1=y_zoom_h1[1], label_roots=h1_labels, label_above=True
     )
     draw_zoom_gene_track(
         ax, h2_zoom, h2z1, h2z2, h2i1, h2i2,
-        h2_overlap, anchor_roots_h2, 'H2', '#e58a2c', '#bd6316', '#edd9bf',
+        h2_overlap, anchor_roots_h2, 'H2', '#e58a2c', '#bd6316', '#d2d2d2',
         y0=y_zoom_h2[0], y1=y_zoom_h2[1], label_roots=h2_labels, label_above=False
     )
     _draw_axis_ticks_text(ax, h1z1, h1z2, y_zoom_h1[1] + 0.030, where='above', n=5, fs=6.0)
     _draw_axis_ticks_text(ax, h2z1, h2z2, y_zoom_h2[0] - 0.030, where='below', n=5, fs=6.0)
 
-    n_ribbons = draw_anchor_ribbons(ax, pairs_df, h1_zoom_pos, h2_zoom_pos, h1z1, h1z2, h2z1, h2z2, y_top=y_rib[1], y_bottom=y_rib[0])
+    n_ribbons, n_inv_ribbons, n_flank_ribbons = draw_anchor_ribbons(
+        ax, pairs_df, h1_zoom_pos, h2_zoom_pos, h1z1, h1z2, h2z1, h2z2,
+        y_top=y_rib[1], y_bottom=y_rib[0], h1_overlap_set=h1_overlap, h2_overlap_set=h2_overlap
+    )
+
+    # Signpost relation between inversion core and non-inversion flanks in zoom tracks.
+    xh1_lo = norm_pos(min(h1i1, h1i2), h1z1, h1z2)
+    xh1_hi = norm_pos(max(h1i1, h1i2), h1z1, h1z2)
+    xh2_lo = norm_pos(min(h2i1, h2i2), h2z1, h2z2)
+    xh2_hi = norm_pos(max(h2i1, h2i2), h2z1, h2z2)
+    for xlo, xhi, y, va in [
+        (xh1_lo, xh1_hi, y_zoom_h1[1] + 0.012, 'bottom'),
+        (xh2_lo, xh2_hi, y_zoom_h2[0] - 0.012, 'top'),
+    ]:
+        xlo = max(0.001, min(0.999, xlo))
+        xhi = max(0.001, min(0.999, xhi))
+        ax.text(max(0.005, xlo / 2), y, 'left flank', ha='center', va=va, fontsize=5.8, color='#555')
+        ax.text((xlo + xhi) / 2, y, 'inversion core', ha='center', va=va, fontsize=6.1, color='#333', fontweight='bold')
+        ax.text(min(0.995, (1 + xhi) / 2), y, 'right flank', ha='center', va=va, fontsize=5.8, color='#555')
 
     # Titles and legends
     ax.text(0.01, 0.985, f"{inv_id} gene organization across inversion (overview + zoom, t1 only)",
@@ -589,17 +620,24 @@ def draw_synteny_panel(ax, inv_id, inv_row, gene_windows, h1_tx_all, h2_tx_all, 
 
     # Compact legend
     lx, ly = 0.01, 0.612
-    ax.add_patch(patches.Rectangle((lx, ly), 0.016, 0.013, facecolor='#fde8e7', edgecolor='none', transform=ax.transAxes))
+    ax.add_patch(patches.Rectangle((lx, ly), 0.016, 0.013, facecolor='#fff2b2', edgecolor='none', transform=ax.transAxes))
     ax.text(lx+0.020, ly+0.0065, 'Inversion span', va='center', fontsize=6.2, transform=ax.transAxes)
     ax.add_patch(patches.Rectangle((lx+0.17, ly), 0.016, 0.013, facecolor='#2f6fab', edgecolor='none', transform=ax.transAxes))
     ax.text(lx+0.190, ly+0.0065, 'overlap genes', va='center', fontsize=6.2, transform=ax.transAxes)
-    ax.add_patch(patches.Rectangle((lx+0.33, ly), 0.016, 0.013, facecolor='#174f8a', edgecolor='none', transform=ax.transAxes))
-    ax.text(lx+0.350, ly+0.0065, 'anchor-paired genes', va='center', fontsize=6.2, transform=ax.transAxes)
-    ax.plot([lx+0.55, lx+0.58], [ly+0.0065, ly+0.0065], color='#e76f51', lw=1.2, transform=ax.transAxes)
-    ax.text(lx+0.585, ly+0.0065, 'anchor pair opposite strand', va='center', fontsize=6.2, transform=ax.transAxes)
-    ax.plot([lx+0.86, lx+0.89], [ly+0.0065, ly+0.0065], color='#2a9d8f', lw=1.2, transform=ax.transAxes)
-    ax.text(lx+0.895, ly+0.0065, 'same strand', va='center', fontsize=6.2, transform=ax.transAxes)
-    ax.text(0.01, 0.595, f"Zoom labels show inversion-overlap genes (all if <=16; otherwise anchor-priority subset). Ribbons shown when both anchor genes fall in zoom windows (n={n_ribbons}).",
+    ax.add_patch(patches.Rectangle((lx+0.33, ly), 0.016, 0.013, facecolor='#d2d2d2', edgecolor='none', transform=ax.transAxes))
+    ax.text(lx+0.350, ly+0.0065, 'non-inversion flanking genes', va='center', fontsize=6.2, transform=ax.transAxes)
+    ax.plot([lx+0.60, lx+0.635], [ly+0.0065, ly+0.0065], color='#67a9ff', lw=1.4, transform=ax.transAxes)
+    ax.text(lx+0.640, ly+0.0065, 'inversion-core anchor links', va='center', fontsize=6.2, transform=ax.transAxes)
+    ax.plot([lx+0.84, lx+0.875], [ly+0.0065, ly+0.0065], color='#b8bdc7', lw=1.2, transform=ax.transAxes)
+    ax.text(lx+0.880, ly+0.0065, 'flanking links', va='center', fontsize=6.2, transform=ax.transAxes)
+
+    # Arrow direction legend (strand signposting)
+    ax.add_patch(patches.FancyArrow(lx+0.01, 0.589, 0.025, 0, width=0.0038, head_width=0.009, head_length=0.008,
+                                    facecolor='#6e6e6e', edgecolor='#6e6e6e', transform=ax.transAxes))
+    ax.add_patch(patches.FancyArrow(lx+0.075, 0.589, -0.025, 0, width=0.0038, head_width=0.009, head_length=0.008,
+                                    facecolor='#6e6e6e', edgecolor='#6e6e6e', transform=ax.transAxes))
+    ax.text(lx+0.095, 0.589, 'arrowheads = transcription direction (+ / - strand)', va='center', fontsize=6.1, transform=ax.transAxes)
+    ax.text(0.01, 0.572, f"Zoom labels show inversion-overlap genes (all if <=16; otherwise anchor-priority subset). Ribbons in zoom windows: n={n_ribbons} (core={n_inv_ribbons}, flank={n_flank_ribbons}). Dashed ribbons = opposite strand orientation.",
             ha='left', va='top', fontsize=5.8, color='#555')
 
     stats = {
@@ -697,6 +735,8 @@ def draw_hic_panel(ax, img_path, hic_row, inv_id):
         subtitle = 'No summary row found'
     ax.text(0.0, 1.01, title, ha='left', va='bottom', transform=ax.transAxes, fontsize=8.5, fontweight='bold')
     ax.text(0.0, 0.985, subtitle, ha='left', va='top', transform=ax.transAxes, fontsize=7.0, color='#333')
+    ax.text(0.0, -0.04, 'Dashed guide lines bracket the inversion core; off-center areas provide non-inversion flank context.',
+            ha='left', va='top', transform=ax.transAxes, fontsize=6.3, color='#555')
 
 
 def main():
