@@ -7,17 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import copyfile
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrow, FancyArrowPatch, PathPatch
-from matplotlib.path import Path as MplPath
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 
 TRACK_COLORS = {"H1": "#4C78A8", "H2": "#E45756"}
-ORIENTATION_COLORS = {"+": "b", "-": "g"}
-NON_INV_LINK_COLOR = "#BFBFBF"
+ORIENTATION_COLORS = {"+": "#4C78A8", "-": "#54A24B"}
+NON_INV_LINK_COLOR = "#C7C7C7"
 INV_INTERVAL_COLOR = "#F57C00"
 
 
@@ -36,10 +31,6 @@ class Feature:
     name: str
     score: str
     strand: str
-
-    @property
-    def mid(self) -> float:
-        return (self.start + self.end) / 2.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +109,19 @@ def write_bed(path: Path, features: list[Feature], prefix: str | None = None) ->
             )
 
 
+def write_summary(path: Path, h1_window: Window, h2_window: Window, h1_count: int, h2_count: int) -> None:
+    rows = [
+        ("H1_window", f"{h1_window.chrom}:{h1_window.start}-{h1_window.end}"),
+        ("H2_window", f"{h2_window.chrom}:{h2_window.start}-{h2_window.end}"),
+        ("H1_genes_in_window", str(h1_count)),
+        ("H2_genes_in_window", str(h2_count)),
+    ]
+    with path.open("w") as out:
+        out.write("metric\tvalue\n")
+        for metric, value in rows:
+            out.write(f"{metric}\t{value}\n")
+
+
 def mb_text(value: int) -> str:
     return f"{value / 1_000_000:.2f}"
 
@@ -147,19 +151,6 @@ def write_layout(path: Path, h1_window: Window, h2_window: Window, label_suffix:
         out.write("e, 0, 1\n")
 
 
-def write_summary(path: Path, h1_window: Window, h2_window: Window, h1_count: int, h2_count: int) -> None:
-    rows = [
-        ("H1_window", f"{h1_window.chrom}:{h1_window.start}-{h1_window.end}"),
-        ("H2_window", f"{h2_window.chrom}:{h2_window.start}-{h2_window.end}"),
-        ("H1_genes_in_window", str(h1_count)),
-        ("H2_genes_in_window", str(h2_count)),
-    ]
-    with path.open("w") as out:
-        out.write("metric\tvalue\n")
-        for metric, value in rows:
-            out.write(f"{metric}\t{value}\n")
-
-
 def parse_blocks(path: Path) -> list[tuple[str, str, str | None]]:
     pairs: list[tuple[str, str, str | None]] = []
     with path.open() as f:
@@ -178,111 +169,110 @@ def parse_blocks(path: Path) -> list[tuple[str, str, str | None]]:
     return pairs
 
 
+def maybe_copy_extra(extra_bed: Path, out_extra: Path) -> None:
+    if extra_bed.resolve() != out_extra.resolve():
+        copyfile(extra_bed, out_extra)
+
+
+def default_output_tag(left_expand_bp: int) -> str:
+    if left_expand_bp % 1_000_000 == 0:
+        return f"restrict_left{left_expand_bp // 1_000_000}Mb"
+    return f"restrict_left{left_expand_bp}bp"
+
+
+def load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    candidates = []
+    if bold:
+        candidates.extend(
+            [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+            ]
+        )
+    candidates.extend(
+        [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        ]
+    )
+    for candidate in candidates:
+        try:
+            return ImageFont.truetype(candidate, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def rgba(color: str, alpha: int = 255) -> tuple[int, int, int, int]:
+    r, g, b = ImageColor.getrgb(color)
+    return (r, g, b, alpha)
+
+
 def x_from_bp(window: Window, bp: float, x0: float, x1: float) -> float:
     span = max(1, window.end - window.start)
     return x0 + (bp - window.start) / span * (x1 - x0)
 
 
-def add_ribbon(
-    ax,
-    top_start: float,
-    top_end: float,
-    bottom_start: float,
-    bottom_end: float,
-    y_top: float,
-    y_bottom: float,
-    color: str,
-    alpha: float,
-    lw: float,
-    zorder: int,
-) -> None:
-    ymid_top = (y_top + y_bottom) / 2 + 0.08
-    ymid_bottom = (y_top + y_bottom) / 2 - 0.02
-    verts = [
-        (top_start, y_top),
-        (top_start, ymid_top),
-        (bottom_start, ymid_top),
-        (bottom_start, y_bottom),
-        (bottom_end, y_bottom),
-        (bottom_end, ymid_bottom),
-        (top_end, ymid_bottom),
-        (top_end, y_top),
-        (top_start, y_top),
-    ]
-    codes = [
-        MplPath.MOVETO,
-        MplPath.CURVE4,
-        MplPath.CURVE4,
-        MplPath.CURVE4,
-        MplPath.LINETO,
-        MplPath.CURVE4,
-        MplPath.CURVE4,
-        MplPath.CURVE4,
-        MplPath.CLOSEPOLY,
-    ]
-    ax.add_patch(
-        PathPatch(
-            MplPath(verts, codes),
-            facecolor=color,
-            edgecolor=color,
-            alpha=alpha,
-            linewidth=lw,
-            zorder=zorder,
-        )
-    )
+def cubic_bezier(p0, p1, p2, p3, n=40):
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        x = ((1 - t) ** 3) * p0[0] + 3 * ((1 - t) ** 2) * t * p1[0] + 3 * (1 - t) * (t**2) * p2[0] + (t**3) * p3[0]
+        y = ((1 - t) ** 3) * p0[1] + 3 * ((1 - t) ** 2) * t * p1[1] + 3 * (1 - t) * (t**2) * p2[1] + (t**3) * p3[1]
+        pts.append((x, y))
+    return pts
 
 
-def draw_gene_track(
-    ax,
-    features: list[Feature],
-    window: Window,
-    y: float,
-    x0: float,
-    x1: float,
-    extra_regions: list[Feature],
-) -> None:
-    ax.plot([x0, x1], [y, y], color="#666666", linewidth=2.0, zorder=3)
-    for feat in extra_regions:
-        if feat.chrom != f"H1_{window.chrom}" and feat.chrom != f"H2_{window.chrom}":
-            continue
-        start = x_from_bp(window, feat.start, x0, x1)
-        end = x_from_bp(window, feat.end, x0, x1)
-        ax.plot([start, end], [y, y], color=INV_INTERVAL_COLOR, linewidth=6.0, zorder=4, solid_capstyle="butt")
-
-    for feat in features:
-        start = x_from_bp(window, feat.start, x0, x1)
-        end = x_from_bp(window, feat.end, x0, x1)
-        dx = end - start
-        color = ORIENTATION_COLORS.get(feat.strand, "b")
-        if abs(dx) < 0.004:
-            dx = 0.004 if feat.strand == "+" else -0.004
-        head_length = min(max(abs(dx) * 0.35, 0.004), 0.012)
-        ax.add_patch(
-            FancyArrow(
-                start,
-                y,
-                dx,
-                0,
-                width=0.0045,
-                head_width=0.018,
-                head_length=head_length,
-                length_includes_head=True,
-                color=color,
-                linewidth=0,
-                zorder=5,
-            )
-        )
+def draw_ribbon(draw: ImageDraw.ImageDraw, top_start, top_end, bottom_start, bottom_end, y_top, y_bottom, color, alpha):
+    ymid_top = (y_top + y_bottom) / 2 + 120
+    ymid_bottom = (y_top + y_bottom) / 2 - 30
+    curve1 = cubic_bezier((top_start, y_top), (top_start, ymid_top), (bottom_start, ymid_top), (bottom_start, y_bottom))
+    curve2 = cubic_bezier((bottom_end, y_bottom), (bottom_end, ymid_bottom), (top_end, ymid_bottom), (top_end, y_top))
+    polygon = curve1 + [(bottom_end, y_bottom)] + curve2 + [(top_start, y_top)]
+    draw.polygon([(int(x), int(y)) for x, y in polygon], fill=rgba(color, alpha))
 
 
-def draw_track_label(ax, label: str, y: float, color: str) -> None:
+def draw_arrow(draw: ImageDraw.ImageDraw, start: float, end: float, y: float, color: str):
+    thickness = 16
+    dx = end - start
+    if abs(dx) < 12:
+        dx = 12 if dx >= 0 else -12
+        end = start + dx
+    head = min(max(abs(dx) * 0.35, 10), 22)
+    if dx >= 0:
+        body_end = end - head
+        pts = [
+            (start, y - thickness // 3),
+            (body_end, y - thickness // 3),
+            (body_end, y - thickness // 2),
+            (end, y),
+            (body_end, y + thickness // 2),
+            (body_end, y + thickness // 3),
+            (start, y + thickness // 3),
+        ]
+    else:
+        body_start = end + head
+        pts = [
+            (start, y - thickness // 3),
+            (body_start, y - thickness // 3),
+            (body_start, y - thickness // 2),
+            (end, y),
+            (body_start, y + thickness // 2),
+            (body_start, y + thickness // 3),
+            (start, y + thickness // 3),
+        ]
+    draw.polygon([(int(x), int(y)) for x, y in pts], fill=rgba(color))
+
+
+def draw_track_label(draw: ImageDraw.ImageDraw, label: str, y: int, color: str, bold_font, small_font):
     main, _, tail = label.partition(": ")
-    ax.text(0.015, y + 0.028, main, ha="left", va="bottom", fontsize=10, fontweight="bold", color=color)
+    draw.text((20, y - 44), main, fill=rgba(color), font=bold_font)
     if tail:
-        ax.text(0.015, y - 0.006, tail, ha="left", va="top", fontsize=8.5, color=color)
+        draw.text((20, y - 12), tail, fill=rgba(color), font=small_font)
 
 
-def render_main_panel(
-    ax,
+def draw_main_panel(
+    img: Image.Image,
     h1_features: list[Feature],
     h2_features: list[Feature],
     h1_window: Window,
@@ -291,18 +281,18 @@ def render_main_panel(
     h2_label: str,
     blocks: list[tuple[str, str, str | None]],
     extra_regions: list[Feature],
+    with_legend: bool,
 ) -> None:
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis("off")
+    x0 = 300
+    x1 = 1760 if with_legend else 2320
+    y_top = 600 if with_legend else 720
+    y_bottom = 1230 if with_legend else 1380
 
-    x0, x1 = 0.28, 0.94
-    y_top, y_bottom = 0.70, 0.30
-    draw_track_label(ax, h1_label, y_top, TRACK_COLORS["H1"])
-    draw_track_label(ax, h2_label, y_bottom, TRACK_COLORS["H2"])
-
-    draw_gene_track(ax, h1_features, h1_window, y_top, x0, x1, extra_regions)
-    draw_gene_track(ax, h2_features, h2_window, y_bottom, x0, x1, extra_regions)
+    base_draw = ImageDraw.Draw(img)
+    overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    label_font = load_font(34, bold=True)
+    small_font = load_font(28)
 
     h1_map = {feat.name: feat for feat in h1_features}
     h2_map = {feat.name: feat for feat in h2_features}
@@ -317,43 +307,57 @@ def render_main_panel(
         bottom_start = x_from_bp(h2_window, h2_feat.start, x0, x1)
         bottom_end = x_from_bp(h2_window, h2_feat.end, x0, x1)
         color = highlight_color or NON_INV_LINK_COLOR
-        alpha = 0.9 if highlight_color else 0.45
-        lw = 1.5 if highlight_color else 1.0
-        zorder = 2 if highlight_color else 1
-        add_ribbon(ax, top_start, top_end, bottom_start, bottom_end, y_top, y_bottom, color, alpha, lw, zorder)
+        alpha = 190 if highlight_color else 110
+        draw_ribbon(overlay_draw, top_start, top_end, bottom_start, bottom_end, y_top, y_bottom, color, alpha)
+
+    img.alpha_composite(overlay)
+    base_draw = ImageDraw.Draw(img)
+    draw_track_label(base_draw, h1_label, y_top, TRACK_COLORS["H1"], label_font, small_font)
+    draw_track_label(base_draw, h2_label, y_bottom, TRACK_COLORS["H2"], label_font, small_font)
+
+    for y in (y_top, y_bottom):
+        base_draw.line([(x0, y), (x1, y)], fill=rgba("#666666"), width=6)
+
+    for feat in extra_regions:
+        if feat.chrom == f"H1_{h1_window.chrom}":
+            start = x_from_bp(h1_window, feat.start, x0, x1)
+            end = x_from_bp(h1_window, feat.end, x0, x1)
+            base_draw.line([(start, y_top), (end, y_top)], fill=rgba(INV_INTERVAL_COLOR), width=18)
+        elif feat.chrom == f"H2_{h2_window.chrom}":
+            start = x_from_bp(h2_window, feat.start, x0, x1)
+            end = x_from_bp(h2_window, feat.end, x0, x1)
+            base_draw.line([(start, y_bottom), (end, y_bottom)], fill=rgba(INV_INTERVAL_COLOR), width=18)
+
+    for feat in h1_features:
+        start = x_from_bp(h1_window, feat.start, x0, x1)
+        end = x_from_bp(h1_window, feat.end, x0, x1)
+        draw_arrow(base_draw, start, end, y_top, ORIENTATION_COLORS.get(feat.strand, TRACK_COLORS["H1"]))
+    for feat in h2_features:
+        start = x_from_bp(h2_window, feat.start, x0, x1)
+        end = x_from_bp(h2_window, feat.end, x0, x1)
+        draw_arrow(base_draw, start, end, y_bottom, ORIENTATION_COLORS.get(feat.strand, TRACK_COLORS["H2"]))
 
 
-def draw_legend(legend_ax, h1_window: Window, h2_window: Window, left_expand_bp: int, highlight_color: str) -> None:
-    legend_ax.set_xlim(0, 1)
-    legend_ax.set_ylim(0, 1)
-    legend_ax.axis("off")
+def draw_legend(img: Image.Image, h1_window: Window, h2_window: Window, left_expand_bp: int, highlight_color: str):
+    draw = ImageDraw.Draw(img)
+    title_font = load_font(50, bold=True)
+    item_font = load_font(34)
+    note_font = load_font(30)
 
-    legend_ax.text(0.04, 0.92, "Legend", fontsize=18, fontweight="bold", ha="left", va="center")
+    x0 = 2200
+    draw.text((x0, 120), "Legend", fill=rgba("#111111"), font=title_font)
 
-    legend_ax.plot([0.08, 0.32], [0.78, 0.78], color=highlight_color, linewidth=4.5, solid_capstyle="round")
-    legend_ax.text(0.36, 0.78, "Inversion links\n(core + 1 left gene)", fontsize=11.5, ha="left", va="center")
+    draw.line([(x0 + 20, 300), (x0 + 170, 300)], fill=rgba(highlight_color), width=12)
+    draw.text((x0 + 210, 260), "Inversion links\n(core + 1 left gene)", fill=rgba("#222222"), font=item_font, spacing=6)
 
-    legend_ax.plot([0.08, 0.32], [0.62, 0.62], color="#9E9E9E", linewidth=4.0, solid_capstyle="round")
-    legend_ax.text(0.36, 0.62, "Non-inversion\ncollinear links", fontsize=11.5, ha="left", va="center")
+    draw.line([(x0 + 20, 540), (x0 + 170, 540)], fill=rgba("#9E9E9E"), width=12)
+    draw.text((x0 + 210, 500), "Non-inversion\ncollinear links", fill=rgba("#222222"), font=item_font, spacing=6)
 
-    legend_ax.plot([0.08, 0.32], [0.46, 0.46], color=INV_INTERVAL_COLOR, linewidth=10.0, solid_capstyle="butt")
-    legend_ax.text(0.36, 0.46, "Inversion interval\n(track highlight)", fontsize=11.5, ha="left", va="center")
+    draw.line([(x0 + 20, 780), (x0 + 170, 780)], fill=rgba(INV_INTERVAL_COLOR), width=28)
+    draw.text((x0 + 210, 740), "Inversion interval\n(track highlight)", fill=rgba("#222222"), font=item_font, spacing=6)
 
-    legend_ax.add_patch(
-        FancyArrow(
-            0.10,
-            0.28,
-            0.20,
-            0,
-            width=0.01,
-            head_width=0.05,
-            head_length=0.04,
-            length_includes_head=True,
-            color="b",
-            linewidth=0,
-        )
-    )
-    legend_ax.text(0.36, 0.28, "Gene arrow direction\n= feature orientation", fontsize=11.5, ha="left", va="center")
+    draw_arrow(draw, x0 + 20, x0 + 170, 1030, ORIENTATION_COLORS["+"])
+    draw.text((x0 + 210, 990), "Gene arrow direction\n= feature orientation", fill=rgba("#222222"), font=item_font, spacing=6)
 
     mb_value = left_expand_bp / 1_000_000.0
     if mb_value.is_integer():
@@ -367,19 +371,13 @@ def draw_legend(legend_ax, h1_window: Window, h2_window: Window, left_expand_bp:
             f"H2 {h2_window.chrom}: {h2_window.start:,}-{h2_window.end:,}",
         ]
     )
-    legend_ax.text(
-        0.04,
-        0.08,
-        window_note,
-        fontsize=10.5,
-        ha="left",
-        va="bottom",
-        bbox=dict(boxstyle="round,pad=0.35", facecolor="#F7F7F7", edgecolor="#777777", linewidth=1.0),
-    )
+    box = (x0 - 10, 1450, 3050, 1840)
+    draw.rounded_rectangle(box, radius=20, fill=rgba("#F5F5F5"), outline=rgba("#7A7A7A"), width=3)
+    draw.multiline_text((x0 + 10, 1475), window_note, fill=rgba("#222222"), font=note_font, spacing=10)
 
 
-def render_figure(
-    outpath: Path,
+def render_png(
+    png_path: Path,
     h1_features: list[Feature],
     h2_features: list[Feature],
     h1_window: Window,
@@ -391,19 +389,10 @@ def render_figure(
     left_expand_bp: int,
     with_legend: bool,
 ) -> None:
-    highlight_color = next((color for _, _, color in blocks if color), "lightskyblue")
-
-    if with_legend:
-        fig = plt.figure(figsize=(12.3, 7.6))
-        main_ax = fig.add_axes((0.03, 0.08, 0.66, 0.84))
-        legend_ax = fig.add_axes((0.73, 0.08, 0.25, 0.84))
-        draw_legend(legend_ax, h1_window, h2_window, left_expand_bp, highlight_color)
-    else:
-        fig = plt.figure(figsize=(9.0, 7.0))
-        main_ax = fig.add_axes((0.03, 0.06, 0.94, 0.88))
-
-    render_main_panel(
-        main_ax,
+    size = (3075, 1906) if with_legend else (2700, 2100)
+    img = Image.new("RGBA", size, (255, 255, 255, 255))
+    draw_main_panel(
+        img,
         h1_features,
         h2_features,
         h1_window,
@@ -412,20 +401,13 @@ def render_figure(
         h2_label,
         blocks,
         extra_regions,
+        with_legend,
     )
-    fig.savefig(outpath, dpi=300)
-    plt.close(fig)
+    if with_legend:
+        highlight_color = next((color for _, _, color in blocks if color), "lightskyblue")
+        draw_legend(img, h1_window, h2_window, left_expand_bp, highlight_color)
 
-
-def maybe_copy_extra(extra_bed: Path, out_extra: Path) -> None:
-    if extra_bed.resolve() != out_extra.resolve():
-        copyfile(extra_bed, out_extra)
-
-
-def default_output_tag(left_expand_bp: int) -> str:
-    if left_expand_bp % 1_000_000 == 0:
-        return f"restrict_left{left_expand_bp // 1_000_000}Mb"
-    return f"restrict_left{left_expand_bp}bp"
+    img.save(png_path)
 
 
 def main() -> None:
@@ -458,14 +440,16 @@ def main() -> None:
     write_bed(h1_prefixed_bed, h1_features, prefix="H1")
     write_bed(h2_prefixed_bed, h2_features, prefix="H2")
     with merged_bed.open("w") as out:
-        write_bed(h1_prefixed_bed, h1_features, prefix="H1")
-    # Re-open so the merged BED preserves H1 then H2 order.
-    with merged_bed.open("w") as out:
         for feat in h1_features:
             out.write(f"H1_{feat.chrom}\t{feat.start}\t{feat.end}\t{feat.name}\t{feat.score}\t{feat.strand}\n")
         for feat in h2_features:
             out.write(f"H2_{feat.chrom}\t{feat.start}\t{feat.end}\t{feat.name}\t{feat.score}\t{feat.strand}\n")
+    write_layout(layout_path, h1_window, h2_window, args.track_right_label)
+    write_summary(summary_path, h1_window, h2_window, len(h1_features), len(h2_features))
+    maybe_copy_extra(args.extra_bed, extra_path)
 
+    blocks = parse_blocks(args.blocks)
+    extra_regions = read_bed(extra_path)
     h1_label = (
         f"H1 {h1_window.chrom} ({mb_text(h1_window.start)}-{mb_text(h1_window.end)} Mb): "
         f"{args.track_right_label}"
@@ -474,17 +458,12 @@ def main() -> None:
         f"H2 {h2_window.chrom} ({mb_text(h2_window.start)}-{mb_text(h2_window.end)} Mb): "
         f"{args.track_right_label}"
     )
-    write_layout(layout_path, h1_window, h2_window, args.track_right_label)
-    write_summary(summary_path, h1_window, h2_window, len(h1_features), len(h2_features))
-    maybe_copy_extra(args.extra_bed, extra_path)
 
-    blocks = parse_blocks(args.blocks)
-    extra_regions = read_bed(extra_path)
     base_prefix = args.outdir / (
         f"H1_vs_H2_{args.inv_id}_jcvi_microsynteny.{output_tag}.strictAnchor.highlightINVplusLeft"
     )
-    render_figure(
-        outpath=Path(str(base_prefix) + ".nolabels.png"),
+    render_png(
+        png_path=Path(str(base_prefix) + ".nolabels.png"),
         h1_features=h1_features,
         h2_features=h2_features,
         h1_window=h1_window,
@@ -496,34 +475,8 @@ def main() -> None:
         left_expand_bp=args.left_expand_bp,
         with_legend=False,
     )
-    render_figure(
-        outpath=Path(str(base_prefix) + ".WITH_LEGEND.png"),
-        h1_features=h1_features,
-        h2_features=h2_features,
-        h1_window=h1_window,
-        h2_window=h2_window,
-        h1_label=h1_label,
-        h2_label=h2_label,
-        blocks=blocks,
-        extra_regions=extra_regions,
-        left_expand_bp=args.left_expand_bp,
-        with_legend=True,
-    )
-    render_figure(
-        outpath=Path(str(base_prefix) + ".nolabels.pdf"),
-        h1_features=h1_features,
-        h2_features=h2_features,
-        h1_window=h1_window,
-        h2_window=h2_window,
-        h1_label=h1_label,
-        h2_label=h2_label,
-        blocks=blocks,
-        extra_regions=extra_regions,
-        left_expand_bp=args.left_expand_bp,
-        with_legend=False,
-    )
-    render_figure(
-        outpath=Path(str(base_prefix) + ".WITH_LEGEND.pdf"),
+    render_png(
+        png_path=Path(str(base_prefix) + ".WITH_LEGEND.png"),
         h1_features=h1_features,
         h2_features=h2_features,
         h1_window=h1_window,
