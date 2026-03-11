@@ -56,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pdf-density", type=int, default=200, help="Rasterization density for --background-pdf.")
     p.add_argument("--h1-bed", type=Path, required=True, help="Top-track H1 BED used by the figure.")
     p.add_argument("--expr-table", type=Path, required=True, help="Per-gene expression table.")
+    p.add_argument(
+        "--expr-metric",
+        choices=["counts", "tpm"],
+        default="counts",
+        help="Expression metric to plot. TPM is available for featureCounts-style tables with Length column.",
+    )
     p.add_argument("--inv-id", default="INV1936", help="Inversion ID present in the expression table.")
     p.add_argument("--window-info", type=Path, default=None, help="Optional inversion window summary TSV with H1_inv_start/H1_inv_end.")
     p.add_argument("--output-prefix", type=Path, required=True, help="Output prefix without suffix.")
@@ -63,6 +69,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--track-x1", type=int, default=None, help="Optional manual override for top track right pixel.")
     p.add_argument("--panel-height", type=int, default=330, help="Height of the new expression panel.")
     p.add_argument("--panel-gap", type=int, default=36, help="Gap between the expression panel and the original figure.")
+    p.add_argument("--ymax", type=float, default=None, help="Optional fixed y-axis maximum for the expression panel.")
     p.add_argument(
         "--crop-background",
         action="store_true",
@@ -156,11 +163,16 @@ def parse_float(text: str) -> float | None:
         return None
 
 
-def load_expression(path: Path, inv_id: str) -> tuple[dict[str, ExpressionGene], int, tuple[int, int] | None]:
+def load_expression(
+    path: Path,
+    inv_id: str,
+    expr_metric: str,
+) -> tuple[dict[str, ExpressionGene], int, tuple[int, int] | None, str]:
     genes: dict[str, ExpressionGene] = {}
     inv_interval: tuple[int, int] | None = None
     sample_count = 0
     wanted = normalize_inv_id(inv_id)
+    expr_label = "counts"
     with path.open() as handle:
         lines = [line for line in handle if line.strip() and not line.startswith("#")]
         reader = csv.DictReader(lines, delimiter="\t")
@@ -168,6 +180,8 @@ def load_expression(path: Path, inv_id: str) -> tuple[dict[str, ExpressionGene],
             raise ValueError(f"Failed to parse header: {path}")
         fieldnames = set(reader.fieldnames)
         if {"INV_ID", "GeneID"}.issubset(fieldnames):
+            if expr_metric == "tpm":
+                raise ValueError("TPM requires a featureCounts-style table with a Length column.")
             sample_cols = [col for col in reader.fieldnames if col not in META_COLUMNS]
             sample_count = len(sample_cols)
             for row in reader:
@@ -183,15 +197,50 @@ def load_expression(path: Path, inv_id: str) -> tuple[dict[str, ExpressionGene],
         elif "Geneid" in fieldnames:
             sample_cols = [col for col in reader.fieldnames if col not in FEATURECOUNTS_META_COLUMNS]
             sample_count = len(sample_cols)
-            for row in reader:
-                gene_id = row["Geneid"].strip()
-                values = [v for v in (parse_float(row.get(col, "")) for col in sample_cols) if v is not None]
-                if not values:
-                    continue
-                genes[gene_id] = ExpressionGene(gene_id=gene_id, mean_expr=sum(values) / len(values))
+            rows = [row for row in reader]
+            if expr_metric == "tpm":
+                expr_label = "TPM"
+                parsed_rows: list[tuple[str, float, list[float]]] = []
+                rpk_sums = [0.0] * sample_count
+                for row in rows:
+                    gene_id = row["Geneid"].strip()
+                    length_bp = parse_float(row.get("Length", ""))
+                    if not gene_id or length_bp is None or length_bp <= 0:
+                        continue
+                    length_kb = length_bp / 1000.0
+                    counts: list[float] = []
+                    for col in sample_cols:
+                        value = parse_float(row.get(col, ""))
+                        counts.append(0.0 if value is None else max(0.0, value))
+                    parsed_rows.append((gene_id, length_kb, counts))
+                    for i, count in enumerate(counts):
+                        rpk_sums[i] += count / length_kb
+
+                scaling_factors = [
+                    (rpk_sum / 1_000_000.0) if rpk_sum > 0 else None
+                    for rpk_sum in rpk_sums
+                ]
+                for gene_id, length_kb, counts in parsed_rows:
+                    tpms: list[float] = []
+                    for i, count in enumerate(counts):
+                        factor = scaling_factors[i]
+                        if factor is None or factor <= 0:
+                            continue
+                        tpms.append((count / length_kb) / factor)
+                    if not tpms:
+                        continue
+                    genes[gene_id] = ExpressionGene(gene_id=gene_id, mean_expr=sum(tpms) / len(tpms))
+            else:
+                expr_label = "counts"
+                for row in rows:
+                    gene_id = row["Geneid"].strip()
+                    values = [v for v in (parse_float(row.get(col, "")) for col in sample_cols) if v is not None]
+                    if not values:
+                        continue
+                    genes[gene_id] = ExpressionGene(gene_id=gene_id, mean_expr=sum(values) / len(values))
         else:
             raise ValueError(f"Unsupported expression table format: {path}")
-    return genes, sample_count, inv_interval
+    return genes, sample_count, inv_interval, expr_label
 
 
 def load_inv_interval_from_window_info(path: Path, inv_id: str) -> tuple[int, int] | None:
@@ -310,9 +359,16 @@ def text_size(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
 
-def write_summary_table(path: Path, features: list[Feature], expr_map: dict[str, ExpressionGene]) -> None:
+def write_summary_table(
+    path: Path,
+    features: list[Feature],
+    expr_map: dict[str, ExpressionGene],
+    expr_label: str,
+) -> None:
+    label = expr_label.strip().lower() if expr_label else "expression"
+    value_col = f"mean_{label}"
     with path.open("w") as handle:
-        handle.write("gene_id\tchrom\tstart\tend\tstrand\tmean_expression\n")
+        handle.write(f"gene_id\tchrom\tstart\tend\tstrand\t{value_col}\n")
         for feat in features:
             gene_id = trim_transcript(feat.name)
             expr = expr_map.get(gene_id)
@@ -345,6 +401,8 @@ def draw_expression_panel(
     x0: int,
     x1: int,
     panel_height: int,
+    ymax_override: float | None,
+    expr_label: str,
     title: str,
     bar_color: str,
     bar_outline: str,
@@ -365,7 +423,7 @@ def draw_expression_panel(
     draw.rectangle([(0, panel_top), (canvas.size[0], panel_bottom)], fill=bg_color)
 
     expressed_genes = sum(1 for feat in features if trim_transcript(feat.name) in expr_map)
-    subtitle = f"Mean counts across {sample_count} RNA-seq libraries ({expressed_genes} genes in this H1 window)"
+    subtitle = f"Mean {expr_label} across {sample_count} RNA-seq libraries ({expressed_genes} genes in this H1 window)"
     title_w, title_h = text_size(draw, title, bold)
     subtitle_w, subtitle_h = text_size(draw, subtitle, regular)
     draw.text(((canvas.size[0] - title_w) / 2, 18), title, fill=rgba("#111111"), font=bold)
@@ -376,7 +434,10 @@ def draw_expression_panel(
         for feat in features
         if trim_transcript(feat.name) in expr_map
     ]
-    ymax = round_up(max(values)) if values else 1
+    if ymax_override is not None:
+        ymax = max(1.0, float(ymax_override))
+    else:
+        ymax = round_up(max(values)) if values else 1
 
     if inv_interval is not None:
         inv_x0 = x_from_bp(inv_interval[0], genome_start, genome_end, x0, x1)
@@ -406,7 +467,9 @@ def draw_expression_panel(
         bar_x1 = x_from_bp(feat.end, genome_start, genome_end, x0, x1)
         if bar_x1 <= bar_x0:
             bar_x1 = bar_x0 + 1
-        bar_top = plot_bottom - (expr.mean_expr / ymax) * plot_height
+        scaled_expr = min(expr.mean_expr, ymax)
+        bar_top = plot_bottom - (scaled_expr / ymax) * plot_height
+        bar_top = max(plot_top, bar_top)
         draw.rectangle(
             [(bar_x0, bar_top), (bar_x1, plot_bottom)],
             fill=rgba(bar_color, 210),
@@ -439,7 +502,11 @@ def main() -> None:
             args.crop_margin,
         )
     h1_features = read_bed(args.h1_bed)
-    expr_map, sample_count, inv_interval = load_expression(args.expr_table, args.inv_id)
+    expr_map, sample_count, inv_interval, expr_label = load_expression(
+        args.expr_table,
+        args.inv_id,
+        args.expr_metric,
+    )
     if inv_interval is None and args.window_info is not None:
         inv_interval = load_inv_interval_from_window_info(args.window_info, args.inv_id)
 
@@ -475,6 +542,8 @@ def main() -> None:
         x0=track_x0,
         x1=track_x1,
         panel_height=args.panel_height,
+        ymax_override=args.ymax,
+        expr_label=expr_label,
         title=args.title,
         bar_color=args.bar_color,
         bar_outline=args.bar_outline,
@@ -488,7 +557,7 @@ def main() -> None:
 
     canvas.save(png_path)
     canvas.convert("RGB").save(pdf_path)
-    write_summary_table(table_path, h1_features, expr_map)
+    write_summary_table(table_path, h1_features, expr_map, expr_label)
 
 
 if __name__ == "__main__":
