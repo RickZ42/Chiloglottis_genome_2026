@@ -5,12 +5,13 @@ import argparse
 import csv
 import math
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
 
 
 META_COLUMNS = {
@@ -62,6 +63,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--track-x1", type=int, default=None, help="Optional manual override for top track right pixel.")
     p.add_argument("--panel-height", type=int, default=330, help="Height of the new expression panel.")
     p.add_argument("--panel-gap", type=int, default=36, help="Gap between the expression panel and the original figure.")
+    p.add_argument(
+        "--crop-background",
+        action="store_true",
+        help="Crop whitespace around the original figure before adding the expression panel.",
+    )
+    p.add_argument(
+        "--crop-margin",
+        type=int,
+        default=24,
+        help="Margin in pixels to keep around the cropped background content.",
+    )
     p.add_argument("--title", default="H1 RNA expression", help="Panel title.")
     p.add_argument("--bar-color", default="#4C78A8", help="Expression bar fill color.")
     p.add_argument("--bar-outline", default="#274E76", help="Expression bar border color.")
@@ -196,13 +208,27 @@ def load_inv_interval_from_window_info(path: Path, inv_id: str) -> tuple[int, in
 def rasterize_pdf(pdf_path: Path, density: int, outdir: Path) -> Path:
     outdir.mkdir(parents=True, exist_ok=True)
     png_path = outdir / f"{pdf_path.stem}.page1.png"
-    cmd = [
-        "convert",
-        "-density",
-        str(density),
-        f"{pdf_path}[0]",
-        str(png_path),
-    ]
+    if shutil.which("convert"):
+        cmd = [
+            "convert",
+            "-density",
+            str(density),
+            f"{pdf_path}[0]",
+            str(png_path),
+        ]
+    elif shutil.which("gs"):
+        cmd = [
+            "gs",
+            "-q",
+            "-dNOPAUSE",
+            "-dBATCH",
+            "-sDEVICE=pngalpha",
+            f"-r{density}",
+            f"-sOutputFile={png_path}",
+            str(pdf_path),
+        ]
+    else:
+        raise RuntimeError("Neither 'convert' nor 'gs' is available for PDF rasterization.")
     subprocess.run(cmd, check=True)
     return png_path
 
@@ -218,10 +244,8 @@ def load_background(args: argparse.Namespace) -> Image.Image:
 def detect_top_track_span(img: Image.Image) -> tuple[int, int, int]:
     rgb = img.convert("RGB")
     width, height = rgb.size
-    best: tuple[int, int, int, int] | None = None
-    y_start = int(height * 0.15)
-    y_end = int(height * 0.50)
-    for y in range(y_start, y_end):
+    candidates: list[tuple[int, int, int, int]] = []
+    for y in range(max(0, int(height * 0.02)), min(height, int(height * 0.98))):
         xs: list[int] = []
         for x in range(width):
             r, g, b = rgb.getpixel((x, y))
@@ -234,11 +258,32 @@ def detect_top_track_span(img: Image.Image) -> tuple[int, int, int]:
         count = len(xs)
         if x1 - x0 < int(width * 0.45):
             continue
-        if best is None or count > best[0]:
-            best = (count, x0, x1, y)
-    if best is None:
+        candidates.append((count, x0, x1, y))
+    if not candidates:
         raise ValueError("Failed to detect the top track span from the background figure.")
+
+    max_span = max(x1 - x0 for _count, x0, x1, _y in candidates)
+    near_top_track = [cand for cand in candidates if (cand[2] - cand[1]) >= max_span * 0.9]
+    best = min(near_top_track, key=lambda item: item[3])
     return best[1], best[2], best[3]
+
+
+def crop_background_to_content(
+    img: Image.Image,
+    bg_color: tuple[int, int, int, int],
+    margin: int,
+) -> Image.Image:
+    bg_rgb = Image.new("RGB", img.size, bg_color[:3])
+    diff = ImageChops.difference(img.convert("RGB"), bg_rgb)
+    bbox = diff.getbbox()
+    if bbox is None:
+        return img
+
+    left = max(0, bbox[0] - margin)
+    top = max(0, bbox[1] - margin)
+    right = min(img.size[0], bbox[2] + margin)
+    bottom = min(img.size[1], bbox[3] + margin)
+    return img.crop((left, top, right, bottom))
 
 
 def x_from_bp(bp: float, genome_start: int, genome_end: int, x0: int, x1: int) -> float:
@@ -387,6 +432,12 @@ def main() -> None:
     args.output_prefix.parent.mkdir(parents=True, exist_ok=True)
 
     background = load_background(args)
+    if args.crop_background:
+        background = crop_background_to_content(
+            background,
+            background.getpixel((0, 0)),
+            args.crop_margin,
+        )
     h1_features = read_bed(args.h1_bed)
     expr_map, sample_count, inv_interval = load_expression(args.expr_table, args.inv_id)
     if inv_interval is None and args.window_info is not None:
