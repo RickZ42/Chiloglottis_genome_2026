@@ -234,6 +234,25 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "savefig.facecolor": "white",
+    "savefig.transparent": False,
+    "font.family": "DejaVu Sans",
+    "font.size": 13,
+    "axes.edgecolor": "#444444",
+    "axes.linewidth": 1.2,
+    "axes.labelcolor": "#202020",
+    "xtick.color": "#202020",
+    "ytick.color": "#202020",
+    "xtick.major.width": 1.1,
+    "ytick.major.width": 1.1,
+    "xtick.major.size": 5,
+    "ytick.major.size": 5,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+})
+
 if len(sys.argv) != 22:
     raise SystemExit(f"Expected 21 args, got {len(sys.argv)-1}")
 
@@ -347,12 +366,21 @@ def dense_from_dump(path, h1_start, h1_end, h2_start, h2_end):
 def fmt_mb(bp):
     return f"{bp / 1e6:.2f}".rstrip("0").rstrip(".")
 
-GUIDE_LINEWIDTH = 2.0
-TITLE_FONTSIZE = 12
-AXIS_LABEL_FONTSIZE = 11
-TICK_LABEL_FONTSIZE = 9
-COLORBAR_LABEL_FONTSIZE = 10
-COLORBAR_TICK_FONTSIZE = 9
+GUIDE_COLOR = "#11a6d8"
+GUIDE_LINEWIDTH = 2.4
+GUIDE_LINESTYLE = (0, (4, 2))
+TITLE_FONTSIZE = 20
+AXIS_LABEL_FONTSIZE = 16
+TICK_LABEL_FONTSIZE = 13
+COLORBAR_LABEL_FONTSIZE = 14
+COLORBAR_TICK_FONTSIZE = 12
+SPINE_LINEWIDTH = 1.2
+
+def style_axis(ax):
+    ax.tick_params(axis="both", which="major", labelsize=TICK_LABEL_FONTSIZE, pad=6)
+    for spine in ax.spines.values():
+        spine.set_linewidth(SPINE_LINEWIDTH)
+        spine.set_color("#4a4a4a")
 
 def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_end, h2_inv_start, h2_inv_end, h2_win_start, h2_win_end, vmax):
     # Enforce same x/y scale and center the matrix in a square plotting canvas.
@@ -361,6 +389,7 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_en
     x_off = 0.5 * (n_common - nbin_x)
     y_off = 0.5 * (n_common - nbin_y)
 
+    ax.set_facecolor("#fbfbfb")
     im = ax.imshow(
         np.log1p(mat),
         origin="lower",
@@ -376,10 +405,10 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_en
     x1 = (h2_inv_start - h2_win_start) / float(bin_size) + x_off
     x2 = (h2_inv_end - h2_win_start) / float(bin_size) + x_off
     for x in (x1, x2):
-        ax.axvline(x=x, color="deepskyblue", lw=GUIDE_LINEWIDTH, ls="--")
+        ax.axvline(x=x, color=GUIDE_COLOR, lw=GUIDE_LINEWIDTH, ls=GUIDE_LINESTYLE)
     for y in (y1, y2):
-        ax.axhline(y=y, color="deepskyblue", lw=GUIDE_LINEWIDTH, ls="--")
-    ax.set_title(title, fontsize=TITLE_FONTSIZE, pad=12)
+        ax.axhline(y=y, color=GUIDE_COLOR, lw=GUIDE_LINEWIDTH, ls=GUIDE_LINESTYLE)
+    ax.set_title(title, fontsize=TITLE_FONTSIZE, pad=14, loc="left", fontweight="semibold")
     ax.set_xlim(-0.5, n_common - 0.5)
     ax.set_ylim(-0.5, n_common - 0.5)
     ax.set_anchor("C")
@@ -394,9 +423,9 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_en
         ylabels = [fmt_mb(y) for y in np.linspace(h1_win_start, h1_win_end, 5)]
         ax.set_yticks(yticks)
         ax.set_yticklabels(ylabels, fontsize=TICK_LABEL_FONTSIZE)
-    ax.tick_params(axis="both", labelsize=TICK_LABEL_FONTSIZE)
-    ax.set_xlabel("H2 Position (Mb)", fontsize=AXIS_LABEL_FONTSIZE)
-    ax.set_ylabel("H1 Position (Mb)", fontsize=AXIS_LABEL_FONTSIZE)
+    style_axis(ax)
+    ax.set_xlabel("H2 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10)
+    ax.set_ylabel("H1 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10)
     return im
 
 fai = load_fai(joint_fai)
@@ -570,8 +599,8 @@ combined_max = 20
 panel_rows = rows[:combined_max]
 n = len(panel_rows)
 
-fig_h = max(7.0 * n + 2.0, 12.0)
-fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(19.0, fig_h), constrained_layout=False)
+fig_h = max(8.0 * n + 2.5, 14.0)
+fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(20.0, fig_h), constrained_layout=False)
 if n == 1:
     axes = np.array([axes])
 
@@ -579,8 +608,8 @@ for i, r in enumerate(panel_rows):
     inv_id = r["ID"]
     m = mat_store[inv_id]
     title = (
-        f"{inv_id}  H1 {r['RefChr']}:{r['RefStart']}-{r['RefEnd']}  vs  "
-        f"H2 {r['QryChr']}:{r['QryStart']}-{r['QryEnd']} ({m['norm']})"
+        f"{inv_id} | H1 {r['RefChr']}:{fmt_mb(r['RefStart'])}-{fmt_mb(r['RefEnd'])} Mb "
+        f"vs H2 {r['QryChr']}:{fmt_mb(r['QryStart'])}-{fmt_mb(r['QryEnd'])} Mb | {m['norm']}"
     )
     im = plot_inter(
         axes[i],
@@ -596,19 +625,20 @@ for i, r in enumerate(panel_rows):
         m["h2_end"],
         global_vmax,
     )
-    cb = fig.colorbar(im, ax=axes[i], fraction=0.025, pad=0.02)
-    cb.set_label("log1p(normalized contact)", fontsize=COLORBAR_LABEL_FONTSIZE)
+    cb = fig.colorbar(im, ax=axes[i], fraction=0.030, pad=0.025)
+    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10)
     cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
+    cb.outline.set_linewidth(1.0)
 
 if n_total > n:
     fig.suptitle(
         f"Inter-haplotype Hi-C context maps (first {n} of {n_total}; H1 window vs H2 window)",
-        fontsize=15,
+        fontsize=19,
         y=0.99,
     )
 else:
-    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=15, y=0.99)
-fig.subplots_adjust(left=0.07, right=0.90, top=0.93, bottom=0.05, hspace=0.72)
+    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=19, y=0.99)
+fig.subplots_adjust(left=0.09, right=0.90, top=0.94, bottom=0.06, hspace=0.78)
 fig.savefig(panel_png, dpi=400, bbox_inches="tight", pad_inches=0.25)
 fig.savefig(panel_pdf, bbox_inches="tight", pad_inches=0.25)
 plt.close(fig)
@@ -617,11 +647,11 @@ plt.close(fig)
 for r in rows:
     inv_id = r["ID"]
     m = mat_store[inv_id]
-    fig, ax = plt.subplots(1, 1, figsize=(13.5, 10.0), constrained_layout=False)
+    fig, ax = plt.subplots(1, 1, figsize=(14.8, 12.2), constrained_layout=False)
     im = plot_inter(
         ax,
         m["mat"],
-        f"{inv_id} H1 {r['RefChr']} vs H2 {r['QryChr']} ({m['norm']})",
+        f"{inv_id} | H1 {r['RefChr']} vs H2 {r['QryChr']} | {m['norm']}-normalized",
         m["h1_inv_start"],
         m["h1_inv_end"],
         m["h1_start"],
@@ -632,10 +662,11 @@ for r in rows:
         m["h2_end"],
         global_vmax,
     )
-    cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
-    cb.set_label("log1p(normalized contact)", fontsize=COLORBAR_LABEL_FONTSIZE)
+    cb = fig.colorbar(im, ax=ax, fraction=0.042, pad=0.025)
+    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10)
     cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
-    fig.subplots_adjust(left=0.09, right=0.89, top=0.90, bottom=0.10)
+    cb.outline.set_linewidth(1.0)
+    fig.subplots_adjust(left=0.11, right=0.90, top=0.92, bottom=0.11)
     fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400, bbox_inches="tight", pad_inches=0.25)
     fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"), bbox_inches="tight", pad_inches=0.25)
     plt.close(fig)
