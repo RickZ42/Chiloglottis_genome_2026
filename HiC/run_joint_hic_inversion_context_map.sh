@@ -18,7 +18,7 @@ Usage:
 Options:
   --h1-fa PATH              H1 FASTA
   --h2-fa PATH              H2 FASTA
-  --inv-tsv PATH            inversion TSV (columns: ID,RefChr,RefStart,RefEnd,QryChr,QryStart,QryEnd)
+  --inv-tsv PATH            inversion TSV (required: ID,RefChr,RefStart,RefEnd,QryChr,QryStart,QryEnd; optional: H1WindowStart,H1WindowEnd,H2WindowStart,H2WindowEnd)
   --r1 PATH                 Hi-C read1 FASTQ(.gz)
   --r2 PATH                 Hi-C read2 FASTQ(.gz)
   --outdir PATH             output directory
@@ -289,8 +289,23 @@ def parse_inv(path):
                 "RefChr": r["RefChr"], "RefStart": rs, "RefEnd": re, "RefLen": rl,
                 "QryChr": r["QryChr"], "QryStart": qs, "QryEnd": qe, "QryLen": ql,
                 "MinLen": min(rl, ql),
+                "H1WindowStart": parse_opt_int(r.get("H1WindowStart")),
+                "H1WindowEnd": parse_opt_int(r.get("H1WindowEnd")),
+                "H2WindowStart": parse_opt_int(r.get("H2WindowStart")),
+                "H2WindowEnd": parse_opt_int(r.get("H2WindowEnd")),
             })
     return out
+
+def parse_opt_int(value):
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except ValueError as exc:
+        raise SystemExit(f"Invalid integer value in optional window column: {value}") from exc
 
 def run_dump(norm, region1, region2, outfile):
     cmd = [
@@ -329,7 +344,17 @@ def dense_from_dump(path, h1_start, h1_end, h2_start, h2_end):
             mat[i, j] += v
     return mat
 
-def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h2_inv_start, h2_inv_end, h2_win_start, vmax):
+def fmt_mb(bp):
+    return f"{bp / 1e6:.2f}".rstrip("0").rstrip(".")
+
+GUIDE_LINEWIDTH = 2.0
+TITLE_FONTSIZE = 12
+AXIS_LABEL_FONTSIZE = 11
+TICK_LABEL_FONTSIZE = 9
+COLORBAR_LABEL_FONTSIZE = 10
+COLORBAR_TICK_FONTSIZE = 9
+
+def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_end, h2_inv_start, h2_inv_end, h2_win_start, h2_win_end, vmax):
     # Enforce same x/y scale and center the matrix in a square plotting canvas.
     nbin_y, nbin_x = mat.shape
     n_common = max(1, max(nbin_y, nbin_x))
@@ -351,26 +376,27 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h2_inv_st
     x1 = (h2_inv_start - h2_win_start) / float(bin_size) + x_off
     x2 = (h2_inv_end - h2_win_start) / float(bin_size) + x_off
     for x in (x1, x2):
-        ax.axvline(x=x, color="deepskyblue", lw=1.1, ls="--")
+        ax.axvline(x=x, color="deepskyblue", lw=GUIDE_LINEWIDTH, ls="--")
     for y in (y1, y2):
-        ax.axhline(y=y, color="deepskyblue", lw=1.1, ls="--")
-    ax.set_title(title, fontsize=9, pad=10)
+        ax.axhline(y=y, color="deepskyblue", lw=GUIDE_LINEWIDTH, ls="--")
+    ax.set_title(title, fontsize=TITLE_FONTSIZE, pad=12)
     ax.set_xlim(-0.5, n_common - 0.5)
     ax.set_ylim(-0.5, n_common - 0.5)
     ax.set_anchor("C")
 
     if nbin_x > 1:
         xticks = np.linspace(x_off, x_off + nbin_x - 1, 5)
-        xlabels = [f"{(h2_win_start + t * bin_size) / 1e6:.1f}" for t in np.linspace(0, nbin_x - 1, 5)]
+        xlabels = [fmt_mb(x) for x in np.linspace(h2_win_start, h2_win_end, 5)]
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xlabels, fontsize=7)
+        ax.set_xticklabels(xlabels, fontsize=TICK_LABEL_FONTSIZE)
     if nbin_y > 1:
         yticks = np.linspace(y_off, y_off + nbin_y - 1, 5)
-        ylabels = [f"{(h1_win_start + t * bin_size) / 1e6:.1f}" for t in np.linspace(0, nbin_y - 1, 5)]
+        ylabels = [fmt_mb(y) for y in np.linspace(h1_win_start, h1_win_end, 5)]
         ax.set_yticks(yticks)
-        ax.set_yticklabels(ylabels, fontsize=7)
-    ax.set_xlabel("H2 Position (Mb)")
-    ax.set_ylabel("H1 Position (Mb)")
+        ax.set_yticklabels(ylabels, fontsize=TICK_LABEL_FONTSIZE)
+    ax.tick_params(axis="both", labelsize=TICK_LABEL_FONTSIZE)
+    ax.set_xlabel("H2 Position (Mb)", fontsize=AXIS_LABEL_FONTSIZE)
+    ax.set_ylabel("H1 Position (Mb)", fontsize=AXIS_LABEL_FONTSIZE)
     return im
 
 fai = load_fai(joint_fai)
@@ -408,10 +434,31 @@ for r in selected:
     if h2_chr not in fai:
         raise SystemExit(f"{h2_chr} not found in joint FAI.")
 
-    h1_start = max(1, min(r["RefStart"], r["RefEnd"]) - flank_bp)
-    h1_end = min(fai[h1_chr], max(r["RefStart"], r["RefEnd"]) + flank_bp)
-    h2_start = max(1, min(r["QryStart"], r["QryEnd"]) - flank_bp)
-    h2_end = min(fai[h2_chr], max(r["QryStart"], r["QryEnd"]) + flank_bp)
+    custom_h1 = [r["H1WindowStart"], r["H1WindowEnd"]]
+    custom_h2 = [r["H2WindowStart"], r["H2WindowEnd"]]
+    if any(v is not None for v in custom_h1) and not all(v is not None for v in custom_h1):
+        raise SystemExit(f"{inv_id}: both H1WindowStart and H1WindowEnd are required when overriding the H1 window.")
+    if any(v is not None for v in custom_h2) and not all(v is not None for v in custom_h2):
+        raise SystemExit(f"{inv_id}: both H2WindowStart and H2WindowEnd are required when overriding the H2 window.")
+
+    if all(v is not None for v in custom_h1):
+        h1_start = max(1, min(custom_h1))
+        h1_end = min(fai[h1_chr], max(custom_h1))
+    else:
+        h1_start = max(1, min(r["RefStart"], r["RefEnd"]) - flank_bp)
+        h1_end = min(fai[h1_chr], max(r["RefStart"], r["RefEnd"]) + flank_bp)
+
+    if all(v is not None for v in custom_h2):
+        h2_start = max(1, min(custom_h2))
+        h2_end = min(fai[h2_chr], max(custom_h2))
+    else:
+        h2_start = max(1, min(r["QryStart"], r["QryEnd"]) - flank_bp)
+        h2_end = min(fai[h2_chr], max(r["QryStart"], r["QryEnd"]) + flank_bp)
+
+    if not (h1_start <= min(r["RefStart"], r["RefEnd"]) <= h1_end and h1_start <= max(r["RefStart"], r["RefEnd"]) <= h1_end):
+        raise SystemExit(f"{inv_id}: H1 window does not fully contain the inversion coordinates.")
+    if not (h2_start <= min(r["QryStart"], r["QryEnd"]) <= h2_end and h2_start <= max(r["QryStart"], r["QryEnd"]) <= h2_end):
+        raise SystemExit(f"{inv_id}: H2 window does not fully contain the inversion coordinates.")
 
     reg1 = f"{h1_chr}:{h1_start}:{h1_end}"
     reg2 = f"{h2_chr}:{h2_start}:{h2_end}"
@@ -542,22 +589,25 @@ for i, r in enumerate(panel_rows):
         m["h1_inv_start"],
         m["h1_inv_end"],
         m["h1_start"],
+        m["h1_end"],
         m["h2_inv_start"],
         m["h2_inv_end"],
         m["h2_start"],
+        m["h2_end"],
         global_vmax,
     )
     cb = fig.colorbar(im, ax=axes[i], fraction=0.025, pad=0.02)
-    cb.set_label("log1p(normalized contact)")
+    cb.set_label("log1p(normalized contact)", fontsize=COLORBAR_LABEL_FONTSIZE)
+    cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
 
 if n_total > n:
     fig.suptitle(
         f"Inter-haplotype Hi-C context maps (first {n} of {n_total}; H1 window vs H2 window)",
-        fontsize=13,
+        fontsize=15,
         y=0.99,
     )
 else:
-    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=13, y=0.99)
+    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=15, y=0.99)
 fig.subplots_adjust(left=0.07, right=0.90, top=0.93, bottom=0.05, hspace=0.72)
 fig.savefig(panel_png, dpi=400, bbox_inches="tight", pad_inches=0.25)
 fig.savefig(panel_pdf, bbox_inches="tight", pad_inches=0.25)
@@ -575,13 +625,16 @@ for r in rows:
         m["h1_inv_start"],
         m["h1_inv_end"],
         m["h1_start"],
+        m["h1_end"],
         m["h2_inv_start"],
         m["h2_inv_end"],
         m["h2_start"],
+        m["h2_end"],
         global_vmax,
     )
     cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
-    cb.set_label("log1p(normalized contact)")
+    cb.set_label("log1p(normalized contact)", fontsize=COLORBAR_LABEL_FONTSIZE)
+    cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
     fig.subplots_adjust(left=0.09, right=0.89, top=0.90, bottom=0.10)
     fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400, bbox_inches="tight", pad_inches=0.25)
     fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"), bbox_inches="tight", pad_inches=0.25)
