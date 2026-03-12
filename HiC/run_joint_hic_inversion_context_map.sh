@@ -239,10 +239,13 @@ plt.rcParams.update({
     "savefig.facecolor": "white",
     "savefig.transparent": False,
     "font.family": "DejaVu Sans",
-    "font.size": 13,
+    "font.size": 15,
+    "font.weight": "bold",
     "axes.edgecolor": "#444444",
     "axes.linewidth": 1.2,
     "axes.labelcolor": "#202020",
+    "axes.labelweight": "bold",
+    "axes.titleweight": "bold",
     "xtick.color": "#202020",
     "ytick.color": "#202020",
     "xtick.major.width": 1.1,
@@ -367,13 +370,13 @@ def fmt_mb(bp):
     return f"{bp / 1e6:.2f}".rstrip("0").rstrip(".")
 
 GUIDE_COLOR = "#11a6d8"
-GUIDE_LINEWIDTH = 2.4
+GUIDE_LINEWIDTH = 4.5
 GUIDE_LINESTYLE = (0, (4, 2))
-TITLE_FONTSIZE = 20
-AXIS_LABEL_FONTSIZE = 16
-TICK_LABEL_FONTSIZE = 13
-COLORBAR_LABEL_FONTSIZE = 14
-COLORBAR_TICK_FONTSIZE = 12
+TITLE_FONTSIZE = 24
+AXIS_LABEL_FONTSIZE = 19
+TICK_LABEL_FONTSIZE = 16
+COLORBAR_LABEL_FONTSIZE = 17
+COLORBAR_TICK_FONTSIZE = 15
 SPINE_LINEWIDTH = 1.2
 
 def style_axis(ax):
@@ -381,6 +384,8 @@ def style_axis(ax):
     for spine in ax.spines.values():
         spine.set_linewidth(SPINE_LINEWIDTH)
         spine.set_color("#4a4a4a")
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontweight("bold")
 
 def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_end, h2_inv_start, h2_inv_end, h2_win_start, h2_win_end, vmax):
     # Enforce same x/y scale and center the matrix in a square plotting canvas.
@@ -408,7 +413,7 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_en
         ax.axvline(x=x, color=GUIDE_COLOR, lw=GUIDE_LINEWIDTH, ls=GUIDE_LINESTYLE)
     for y in (y1, y2):
         ax.axhline(y=y, color=GUIDE_COLOR, lw=GUIDE_LINEWIDTH, ls=GUIDE_LINESTYLE)
-    ax.set_title(title, fontsize=TITLE_FONTSIZE, pad=14, loc="left", fontweight="semibold")
+    ax.set_title(title, fontsize=TITLE_FONTSIZE, pad=14, loc="left", fontweight="bold")
     ax.set_xlim(-0.5, n_common - 0.5)
     ax.set_ylim(-0.5, n_common - 0.5)
     ax.set_anchor("C")
@@ -424,8 +429,8 @@ def plot_inter(ax, mat, title, h1_inv_start, h1_inv_end, h1_win_start, h1_win_en
         ax.set_yticks(yticks)
         ax.set_yticklabels(ylabels, fontsize=TICK_LABEL_FONTSIZE)
     style_axis(ax)
-    ax.set_xlabel("H2 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10)
-    ax.set_ylabel("H1 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10)
+    ax.set_xlabel("H2 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10, fontweight="bold")
+    ax.set_ylabel("H1 position (Mb)", fontsize=AXIS_LABEL_FONTSIZE, labelpad=10, fontweight="bold")
     return im
 
 fai = load_fai(joint_fai)
@@ -626,18 +631,21 @@ for i, r in enumerate(panel_rows):
         global_vmax,
     )
     cb = fig.colorbar(im, ax=axes[i], fraction=0.030, pad=0.025)
-    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10)
+    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10, fontweight="bold")
     cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
     cb.outline.set_linewidth(1.0)
+    for label in cb.ax.get_yticklabels():
+        label.set_fontweight("bold")
 
 if n_total > n:
     fig.suptitle(
         f"Inter-haplotype Hi-C context maps (first {n} of {n_total}; H1 window vs H2 window)",
-        fontsize=19,
+        fontsize=22,
         y=0.99,
+        fontweight="bold",
     )
 else:
-    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=19, y=0.99)
+    fig.suptitle("Inter-haplotype Hi-C context maps (H1 window vs H2 window)", fontsize=22, y=0.99, fontweight="bold")
 fig.subplots_adjust(left=0.09, right=0.90, top=0.94, bottom=0.06, hspace=0.78)
 fig.savefig(panel_png, dpi=400, bbox_inches="tight", pad_inches=0.25)
 fig.savefig(panel_pdf, bbox_inches="tight", pad_inches=0.25)
@@ -663,9 +671,11 @@ for r in rows:
         global_vmax,
     )
     cb = fig.colorbar(im, ax=ax, fraction=0.042, pad=0.025)
-    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10)
+    cb.set_label("log1p normalized contact", fontsize=COLORBAR_LABEL_FONTSIZE, labelpad=10, fontweight="bold")
     cb.ax.tick_params(labelsize=COLORBAR_TICK_FONTSIZE)
     cb.outline.set_linewidth(1.0)
+    for label in cb.ax.get_yticklabels():
+        label.set_fontweight("bold")
     fig.subplots_adjust(left=0.11, right=0.90, top=0.92, bottom=0.11)
     fig.savefig(os.path.join(png_dir, f"{inv_id}.hic_context.juicer.png"), dpi=400, bbox_inches="tight", pad_inches=0.25)
     fig.savefig(os.path.join(pdf_dir, f"{inv_id}.hic_context.juicer.pdf"), bbox_inches="tight", pad_inches=0.25)
