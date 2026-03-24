@@ -90,6 +90,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Hide panel title/subtitle and x-axis label; keep axis numbers and the inversion label.",
     )
+    p.add_argument(
+        "--hide-x-axis",
+        action="store_true",
+        help="Hide x-axis baseline and x-axis numbers/labels.",
+    )
+    p.add_argument(
+        "--panel-only",
+        action="store_true",
+        help="Export only the RNA expression panel without compositing the background figure.",
+    )
+    p.add_argument("--export-width-cm", type=float, default=None, help="Optional output width in cm.")
+    p.add_argument("--export-height-cm", type=float, default=None, help="Optional output height in cm.")
+    p.add_argument("--export-dpi", type=int, default=600, help="DPI to use when export size in cm is requested.")
     return p.parse_args()
 
 
@@ -394,6 +407,12 @@ def write_summary_table(
             )
 
 
+def resize_canvas_to_cm(canvas: Image.Image, width_cm: float, height_cm: float, dpi: int) -> Image.Image:
+    width_px = max(1, int(round(width_cm / 2.54 * dpi)))
+    height_px = max(1, int(round(height_cm / 2.54 * dpi)))
+    return canvas.resize((width_px, height_px), Image.Resampling.LANCZOS)
+
+
 def draw_expression_panel(
     canvas: Image.Image,
     bg_color: tuple[int, int, int, int],
@@ -413,6 +432,7 @@ def draw_expression_panel(
     bar_outline: str,
     inv_shade_color: str,
     minimal_text: bool,
+    hide_x_axis: bool,
 ) -> None:
     overlay = Image.new("RGBA", canvas.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(overlay)
@@ -422,8 +442,8 @@ def draw_expression_panel(
 
     panel_top = 0
     panel_bottom = panel_height
-    plot_top = 92
-    plot_bottom = panel_bottom - 52
+    plot_top = 24 if minimal_text else 92
+    plot_bottom = panel_bottom - (18 if hide_x_axis else 52)
     plot_height = plot_bottom - plot_top
 
     draw.rectangle([(0, panel_top), (canvas.size[0], panel_bottom)], fill=bg_color)
@@ -463,8 +483,9 @@ def draw_expression_panel(
         label_w, label_h = text_size(draw, label, small)
         draw.text((x0 - label_w - 10, y - label_h / 2), label, fill=rgba("#555555"), font=small)
 
-    draw.line([(x0, plot_bottom), (x1, plot_bottom)], fill=rgba("#666666"), width=2)
     draw.line([(x0, plot_top), (x0, plot_bottom)], fill=rgba("#666666"), width=2)
+    if not hide_x_axis:
+        draw.line([(x0, plot_bottom), (x1, plot_bottom)], fill=rgba("#666666"), width=2)
 
     for feat in features:
         expr = expr_map.get(trim_transcript(feat.name))
@@ -484,16 +505,17 @@ def draw_expression_panel(
             width=1,
         )
 
-    start_label = format_mb(genome_start)
-    end_label = format_mb(genome_end)
-    start_w, start_h = text_size(draw, start_label, small)
-    end_w, end_h = text_size(draw, end_label, small)
-    draw.text((x0, plot_bottom + 10), start_label, fill=rgba("#555555"), font=small)
-    draw.text((x1 - end_w, plot_bottom + 10), end_label, fill=rgba("#555555"), font=small)
-    if not minimal_text:
-        axis_label = f"{features[0].chrom} coordinates aligned to the original H1 track"
-        axis_w, _axis_h = text_size(draw, axis_label, small)
-        draw.text(((x0 + x1 - axis_w) / 2, plot_bottom + 10), axis_label, fill=rgba("#555555"), font=small)
+    if not hide_x_axis:
+        start_label = format_mb(genome_start)
+        end_label = format_mb(genome_end)
+        _start_w, _start_h = text_size(draw, start_label, small)
+        end_w, _end_h = text_size(draw, end_label, small)
+        draw.text((x0, plot_bottom + 10), start_label, fill=rgba("#555555"), font=small)
+        draw.text((x1 - end_w, plot_bottom + 10), end_label, fill=rgba("#555555"), font=small)
+        if not minimal_text:
+            axis_label = f"{features[0].chrom} coordinates aligned to the original H1 track"
+            axis_w, _axis_h = text_size(draw, axis_label, small)
+            draw.text(((x0 + x1 - axis_w) / 2, plot_bottom + 10), axis_label, fill=rgba("#555555"), font=small)
 
     canvas.alpha_composite(overlay)
 
@@ -501,6 +523,8 @@ def draw_expression_panel(
 def main() -> None:
     args = parse_args()
     args.output_prefix.parent.mkdir(parents=True, exist_ok=True)
+    if (args.export_width_cm is None) != (args.export_height_cm is None):
+        raise ValueError("Both --export-width-cm and --export-height-cm must be provided together.")
 
     background = load_background(args)
     if args.crop_background:
@@ -533,11 +557,14 @@ def main() -> None:
     panel_offset = args.panel_height + args.panel_gap
     bg_color = background.getpixel((0, 0))
 
-    canvas = Image.new(
-        "RGBA",
-        (background.size[0], background.size[1] + panel_offset),
-        bg_color,
-    )
+    if args.panel_only:
+        canvas = Image.new("RGBA", (background.size[0], args.panel_height), bg_color)
+    else:
+        canvas = Image.new(
+            "RGBA",
+            (background.size[0], background.size[1] + panel_offset),
+            bg_color,
+        )
     draw_expression_panel(
         canvas=canvas,
         bg_color=bg_color,
@@ -557,15 +584,26 @@ def main() -> None:
         bar_outline=args.bar_outline,
         inv_shade_color=args.inv_shade_color,
         minimal_text=args.minimal_text,
+        hide_x_axis=args.hide_x_axis,
     )
-    canvas.alpha_composite(background, dest=(0, panel_offset))
+    if not args.panel_only:
+        canvas.alpha_composite(background, dest=(0, panel_offset))
+
+    if args.export_width_cm is not None and args.export_height_cm is not None:
+        canvas = resize_canvas_to_cm(canvas, args.export_width_cm, args.export_height_cm, args.export_dpi)
 
     png_path = Path(f"{args.output_prefix}.png")
     pdf_path = Path(f"{args.output_prefix}.pdf")
     table_path = Path(f"{args.output_prefix}.expression.tsv")
 
-    canvas.save(png_path)
-    canvas.convert("RGB").save(pdf_path)
+    png_save_kwargs: dict[str, object] = {}
+    pdf_save_kwargs: dict[str, object] = {}
+    if args.export_width_cm is not None and args.export_height_cm is not None:
+        png_save_kwargs["dpi"] = (args.export_dpi, args.export_dpi)
+        pdf_save_kwargs["resolution"] = args.export_dpi
+
+    canvas.save(png_path, **png_save_kwargs)
+    canvas.convert("RGB").save(pdf_path, **pdf_save_kwargs)
     write_summary_table(table_path, h1_features, expr_map, expr_label)
 
 
