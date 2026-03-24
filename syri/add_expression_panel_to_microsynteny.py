@@ -85,6 +85,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--bar-color", default="#4C78A8", help="Expression bar fill color.")
     p.add_argument("--bar-outline", default="#274E76", help="Expression bar border color.")
     p.add_argument("--inv-shade-color", default="#F57C00", help="Inversion interval highlight color.")
+    p.add_argument(
+        "--minimal-text",
+        action="store_true",
+        help="Hide panel title/subtitle and x-axis label; keep axis numbers and the inversion label.",
+    )
     return p.parse_args()
 
 
@@ -407,6 +412,7 @@ def draw_expression_panel(
     bar_color: str,
     bar_outline: str,
     inv_shade_color: str,
+    minimal_text: bool,
 ) -> None:
     overlay = Image.new("RGBA", canvas.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(overlay)
@@ -423,11 +429,12 @@ def draw_expression_panel(
     draw.rectangle([(0, panel_top), (canvas.size[0], panel_bottom)], fill=bg_color)
 
     expressed_genes = sum(1 for feat in features if trim_transcript(feat.name) in expr_map)
-    subtitle = f"Mean {expr_label} across {sample_count} RNA-seq libraries ({expressed_genes} genes in this H1 window)"
-    title_w, title_h = text_size(draw, title, bold)
-    subtitle_w, subtitle_h = text_size(draw, subtitle, regular)
-    draw.text(((canvas.size[0] - title_w) / 2, 18), title, fill=rgba("#111111"), font=bold)
-    draw.text(((canvas.size[0] - subtitle_w) / 2, 18 + title_h + 6), subtitle, fill=rgba("#555555"), font=regular)
+    if not minimal_text:
+        subtitle = f"Mean {expr_label} across {sample_count} RNA-seq libraries ({expressed_genes} genes in this H1 window)"
+        title_w, title_h = text_size(draw, title, bold)
+        subtitle_w, subtitle_h = text_size(draw, subtitle, regular)
+        draw.text(((canvas.size[0] - title_w) / 2, 18), title, fill=rgba("#111111"), font=bold)
+        draw.text(((canvas.size[0] - subtitle_w) / 2, 18 + title_h + 6), subtitle, fill=rgba("#555555"), font=regular)
 
     values = [
         expr_map[trim_transcript(feat.name)].mean_expr
@@ -483,9 +490,10 @@ def draw_expression_panel(
     end_w, end_h = text_size(draw, end_label, small)
     draw.text((x0, plot_bottom + 10), start_label, fill=rgba("#555555"), font=small)
     draw.text((x1 - end_w, plot_bottom + 10), end_label, fill=rgba("#555555"), font=small)
-    axis_label = f"{features[0].chrom} coordinates aligned to the original H1 track"
-    axis_w, _axis_h = text_size(draw, axis_label, small)
-    draw.text(((x0 + x1 - axis_w) / 2, plot_bottom + 10), axis_label, fill=rgba("#555555"), font=small)
+    if not minimal_text:
+        axis_label = f"{features[0].chrom} coordinates aligned to the original H1 track"
+        axis_w, _axis_h = text_size(draw, axis_label, small)
+        draw.text(((x0 + x1 - axis_w) / 2, plot_bottom + 10), axis_label, fill=rgba("#555555"), font=small)
 
     canvas.alpha_composite(overlay)
 
@@ -548,6 +556,7 @@ def main() -> None:
         bar_color=args.bar_color,
         bar_outline=args.bar_outline,
         inv_shade_color=args.inv_shade_color,
+        minimal_text=args.minimal_text,
     )
     canvas.alpha_composite(background, dest=(0, panel_offset))
 
