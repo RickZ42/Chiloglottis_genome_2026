@@ -206,6 +206,93 @@ def safe_fmt(x: float) -> str:
     return "NA" if (isinstance(x, float) and math.isnan(x)) else f"{x:.6f}"
 
 
+def write_overview_table(
+    path: str,
+    inv_id_list: Sequence[str],
+    inv_meta_rows: Sequence[dict],
+    per_inv_gene_values: Dict[str, Dict[str, List[float]]],
+    sample_cols: Sequence[str],
+) -> None:
+    meta_by_inv = {row["INV_ID"]: row for row in inv_meta_rows if row.get("INV_ID")}
+    fieldnames = [
+        "INV_ID",
+        "RefChr",
+        "RefStart",
+        "RefEnd",
+        "RefLen_bp",
+        "QryChr",
+        "QryStart",
+        "QryEnd",
+        "QryLen_bp",
+        "GenesWithExpression",
+        "Samples",
+        "MeanExpr_AcrossSamples",
+        "MedianExpr_AcrossSamples",
+        "MinExpr_AcrossSamples",
+        "MaxExpr_AcrossSamples",
+    ]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+        writer.writeheader()
+        for inv in inv_id_list:
+            meta = meta_by_inv.get(inv, {})
+            ref_start = meta.get("RefStart", "")
+            ref_end = meta.get("RefEnd", "")
+            qry_start = meta.get("QryStart", "")
+            qry_end = meta.get("QryEnd", "")
+            try:
+                ref_len = abs(int(ref_end) - int(ref_start)) + 1
+            except (TypeError, ValueError):
+                ref_len = ""
+            try:
+                qry_len = abs(int(qry_end) - int(qry_start)) + 1
+            except (TypeError, ValueError):
+                qry_len = ""
+
+            gene_values = list(per_inv_gene_values.get(inv, {}).values())
+            per_sample_means = []
+            for si in range(len(sample_cols)):
+                vals = [gv[si] for gv in gene_values]
+                per_sample_means.append(nanmean(vals))
+            row = {
+                "INV_ID": inv,
+                "RefChr": meta.get("RefChr", ""),
+                "RefStart": ref_start,
+                "RefEnd": ref_end,
+                "RefLen_bp": ref_len,
+                "QryChr": meta.get("QryChr", ""),
+                "QryStart": qry_start,
+                "QryEnd": qry_end,
+                "QryLen_bp": qry_len,
+                "GenesWithExpression": str(len(gene_values)),
+                "Samples": str(len(sample_cols)),
+                "MeanExpr_AcrossSamples": safe_fmt(nanmean(per_sample_means)),
+                "MedianExpr_AcrossSamples": safe_fmt(nanmedian(per_sample_means)),
+                "MinExpr_AcrossSamples": safe_fmt(nanmin(per_sample_means)),
+                "MaxExpr_AcrossSamples": safe_fmt(nanmax(per_sample_means)),
+            }
+            writer.writerow(row)
+
+
+def write_for_hic_table(path: str, inv_meta_rows: Sequence[dict]) -> None:
+    fieldnames = ["ID", "RefChr", "RefStart", "RefEnd", "QryChr", "QryStart", "QryEnd"]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+        writer.writeheader()
+        for row in inv_meta_rows:
+            writer.writerow(
+                {
+                    "ID": row.get("INV_ID", ""),
+                    "RefChr": row.get("RefChr", ""),
+                    "RefStart": row.get("RefStart", ""),
+                    "RefEnd": row.get("RefEnd", ""),
+                    "QryChr": row.get("QryChr", ""),
+                    "QryStart": row.get("QryStart", ""),
+                    "QryEnd": row.get("QryEnd", ""),
+                }
+            )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Map RNA expression values to genes overlapping inversion candidates."
@@ -293,6 +380,8 @@ def main() -> None:
     out_matrix = f"{out_prefix}.per_inversion_mean_matrix.tsv"
     out_missing_genes = f"{out_prefix}.missing_genes_in_expression.tsv"
     out_inv_meta = f"{out_prefix}.selected_inversions.tsv"
+    out_overview = f"{out_prefix}.overview.tsv"
+    out_inv_meta_hic = f"{out_prefix}.selected_inversions.for_hic.tsv"
 
     # Write per-gene expression table
     gene_expr_fields = [c for c in overlap_cols if c in genes_expr_rows[0]] + sample_cols
@@ -369,12 +458,19 @@ def main() -> None:
         for row in inv_meta_rows:
             w.writerow(row)
 
+    if meta_cols:
+        write_overview_table(out_overview, inv_id_list, inv_meta_rows, per_inv_gene_values, sample_cols)
+        write_for_hic_table(out_inv_meta_hic, inv_meta_rows)
+
     eprint("[INFO] Done.")
     eprint(f"[INFO] Gene-level output: {out_gene_expr}")
     eprint(f"[INFO] Per-sample summary: {out_summary}")
     eprint(f"[INFO] Mean matrix: {out_matrix}")
     eprint(f"[INFO] Missing genes: {out_missing_genes}")
     eprint(f"[INFO] Inversion metadata: {out_inv_meta}")
+    if meta_cols:
+        eprint(f"[INFO] Overview table: {out_overview}")
+        eprint(f"[INFO] Hi-C inversion metadata: {out_inv_meta_hic}")
 
 
 if __name__ == "__main__":

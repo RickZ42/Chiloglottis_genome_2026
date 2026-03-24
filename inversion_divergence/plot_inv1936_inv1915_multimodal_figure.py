@@ -23,19 +23,23 @@ DEFAULT_INV_IDS = ["INV1936", "INV1915"]
 
 def parse_args():
     p = argparse.ArgumentParser(description="Build publication-style composite inversion figure for INV1936 and INV1915")
-    p.add_argument("--inv-tsv", default="Output/20260127Genome/H1/inversion_rna_minimap2/inv_rna_expr_minimap2_all.selected_inversions.for_hic.tsv")
+    p.add_argument("--inv-tsv", default="Output/20260127Genome/H1/inversion_rna_minimap2_stage_sun_flower_L/inv_rna_expr_minimap2_sun_flower_L.selected_inversions.for_hic.tsv")
     p.add_argument("--inv-ids", default=",".join(DEFAULT_INV_IDS))
     p.add_argument("--hic-summary", default="Output/20260127Genome/hic_inv_context_joint_INV1936_INV1915/hic_inv_context.summary.tsv")
     p.add_argument("--hic-png-dir", default="Output/20260127Genome/hic_inv_context_joint_INV1936_INV1915/per_inversion_png")
-    p.add_argument("--rna-genes", default="Output/20260127Genome/H1/inversion_rna_minimap2/inv_rna_expr_minimap2_all.genes_expression.tsv")
+    p.add_argument("--rna-genes", default="Output/20260127Genome/H1/inversion_rna_minimap2_stage_sun_flower_L/inv_rna_expr_minimap2_sun_flower_L.genes_expression.tsv")
     p.add_argument("--anchor-pairs", default="Output/20260127Genome/H1H2_inversion_divergence/selected_inversions_quick/INV1936_INV1915/selected_inversions.anchor_divergence_pairs.tsv")
     p.add_argument("--gene-counts", default="Output/20260127Genome/H1H2_inversion_divergence/selected_inversions_quick/INV1936_INV1915/selected_inversions.gene_counts.tsv")
     p.add_argument("--h1-gtf", default="compare_H1_vs_Ophrys/New_H1_H2_ophrys_Arobx/H1t1.gtf")
     p.add_argument("--h2-gtf", default="compare_H1_vs_Ophrys/New_H1_H2_ophrys_Arobx/H2t1.gtf")
     p.add_argument("--h1-func", default="Output/20260127Genome/functional_annotation/H1.Functional_Annotation_results.txt")
     p.add_argument("--h2-func", default="Output/20260127Genome/functional_annotation/H2.Functional_Annotation_results.txt")
-    p.add_argument("--outdir", default="Output/20260127Genome/inversion_pubfig_INV1936_INV1915")
+    p.add_argument("--outdir", default="Output/20260127Genome/inversion_pubfig_INV1936_INV1915_sunflower_L")
     p.add_argument("--prefix", default="INV1936_INV1915_multimodal_pubfig")
+    p.add_argument(
+        "--rna-label",
+        default="sunflower-stage labellum RNA counts (UV-treated subset; n=3 replicates)",
+    )
     # Keep only compact context around inversion core so flanks are visible but not dominant.
     p.add_argument("--gene-flank-max", type=int, default=300000)
     p.add_argument("--gene-flank-min", type=int, default=150000)
@@ -775,7 +779,7 @@ def main():
     fig.text(0.012, 0.995, 'Comparative inversion panels for INV1936 and INV1915 (H1 vs H2)',
              ha='left', va='top', fontsize=15, fontweight='bold')
     fig.text(0.012, 0.980,
-             'Left panel uses overview+zoom gene organization (t1-only). Middle panels summarize H1 inversion-overlap RNA counts (bar = mean log2(count+1); heatmap = within-gene z-score after log2 transform). Right panel shows inter-haplotype Hi-C context.',
+             f"Left panel uses overview+zoom gene organization (t1-only). Middle panels summarize H1 inversion-overlap {args.rna_label} (bar = mean log2(count+1); heatmap = within-gene z-score after log2 transform). Right panel shows inter-haplotype Hi-C context.",
              ha='left', va='top', fontsize=8.5, color='#333')
 
     summary_rows = []

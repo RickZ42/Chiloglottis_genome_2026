@@ -89,10 +89,18 @@ def build_hic_all(joint_path: str, other_path: str, strict_hq_path: str | None) 
     return hic
 
 
-def build_readme_rows(hic: pd.DataFrame, rna_overview: pd.DataFrame, merged: pd.DataFrame) -> pd.DataFrame:
+def build_readme_rows(
+    hic: pd.DataFrame,
+    rna_overview: pd.DataFrame,
+    merged: pd.DataFrame,
+    rna_dataset_label: str,
+    rna_dataset_note: str,
+) -> pd.DataFrame:
     rna_id_set = set(rna_overview["INV_ID"].astype(str))
     merged_rna_hits = int(merged["RNA_has_expression_summary"].fillna(False).astype(bool).sum())
     rows = [
+        ["RNA dataset label", rna_dataset_label or "unspecified"],
+        ["RNA dataset note", rna_dataset_note or "none"],
         ["HiC inversions (combined)", len(hic)],
         ["RNA inversions with gene-expression summary", len(rna_overview)],
         ["Merged rows", len(merged)],
@@ -116,6 +124,16 @@ def main() -> None:
         "--inv-gene-overlap-summary",
         default=None,
         help="Optional H1_INV_gene_overlap_summary.tsv to add OverlappingGeneCount.",
+    )
+    ap.add_argument(
+        "--rna-dataset-label",
+        default="",
+        help="Optional label recorded in the workbook README.",
+    )
+    ap.add_argument(
+        "--rna-dataset-note",
+        default="",
+        help="Optional note recorded in the workbook README.",
     )
     ap.add_argument("--out-xlsx", required=True, help="Output XLSX path.")
     args = ap.parse_args()
@@ -164,7 +182,13 @@ def main() -> None:
 
     rna_mean_clean = clean_rna_mean_matrix(rna_mean)
     rna_sample_clean = clean_rna_sample_summary(rna_sample)
-    readme = build_readme_rows(hic, rna_overview, merged)
+    readme = build_readme_rows(
+        hic,
+        rna_overview,
+        merged,
+        args.rna_dataset_label,
+        args.rna_dataset_note,
+    )
 
     out_path = Path(args.out_xlsx)
     out_path.parent.mkdir(parents=True, exist_ok=True)
