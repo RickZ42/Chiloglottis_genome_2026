@@ -34,9 +34,9 @@ H2_LOCAL_BED = ROOT / "Output/20260127Genome/syri/syri_asm10/INV1936_jcvi_micros
 H2_BP_BED = ROOT / "Output/20260127Genome/inv1936_truncation_analysis/INV1936_H2_breakpoint.bed"
 H2_GENE_BED = ROOT / "Output/20260127Genome/inv1936_truncation_analysis/INV1936_H2_gene.bed"
 H2_BAMS = [
-    ROOT / "Output/20260127Genome/H2/inversion_rna_minimap2/bam/141L_S13.sorted.bam",
-    ROOT / "Output/20260127Genome/H2/inversion_rna_minimap2/bam/142L_S14.sorted.bam",
-    ROOT / "Output/20260127Genome/H2/inversion_rna_minimap2/bam/143L_S15.sorted.bam",
+    ROOT / "Output/20260127Genome/inv1936_targeted_h2_remap/bam/141L_S13.H2_targeted.sorted.bam",
+    ROOT / "Output/20260127Genome/inv1936_targeted_h2_remap/bam/142L_S14.H2_targeted.sorted.bam",
+    ROOT / "Output/20260127Genome/inv1936_targeted_h2_remap/bam/143L_S15.H2_targeted.sorted.bam",
 ]
 
 SCAFFOLD = "scaffold_5"
@@ -54,7 +54,7 @@ H1_ZOOM_END = 7_279_782
 H2_GENE_START = 7_448_673
 H2_GENE_END = 7_501_391
 H2_BP = 7_450_031
-H2_INV_START = 6_197_818
+H2_INV_START = 6_399_204
 H2_INV_END = 7_450_031
 H2_BROAD_START = 7_438_673
 H2_BROAD_END = 7_511_391
@@ -157,6 +157,7 @@ def write_interval_beds(
     gene_start1: int,
     gene_end1: int,
     gene_label: str,
+    gene_strand: str,
 ) -> None:
     interval = outdir / f"{prefix}_interval.bed"
     boundaries = outdir / f"{prefix}_boundaries.bed"
@@ -167,7 +168,7 @@ def write_interval_beds(
         fh.write(f"{chrom}\t{inv_start1 - 1}\t{inv_start1}\t{prefix}_left_boundary\t0\t+\n")
         fh.write(f"{chrom}\t{inv_end1 - 1}\t{inv_end1}\t{prefix}_right_boundary\t0\t+\n")
     with gene.open("w") as fh:
-        fh.write(f"{chrom}\t{gene_start1 - 1}\t{gene_end1}\t{gene_label}\t0\t+\n")
+        fh.write(f"{chrom}\t{gene_start1 - 1}\t{gene_end1}\t{gene_label}\t0\t{gene_strand}\n")
 
 
 def slice_bam(in_bam: Path, out_bam: Path, region: str) -> None:
@@ -193,8 +194,12 @@ def write_readme(out_path: Path) -> None:
     text = f"""INV1936 H1/H2 IGV-ready comparison bundle
 
 Purpose
-- Compare the same sunflower-stage labellum RNA subset mapped to H1 and H2 for INV1936.
+- Compare the same sunflower-stage labellum RNA subset across H1 and H2 for INV1936.
 - Support side-by-side inspection of gene structure, breakpoint position, repeat context, and RNA read/junction behavior.
+
+Mapping note
+- H1 BAMs are slices from the existing full-genome H1 minimap2 RNA alignments.
+- H2 BAMs are derived from IGV-focused remapping of the same three libraries to the H2 scaffold_5 local reference, used here to enable direct read-level inspection of the focal locus under local resource limits.
 
 Samples
 - 141L_S13
@@ -258,13 +263,13 @@ def main() -> None:
     subset_gtf(H1_GTF, H1_DIR / "braker.INV1936_H1_broad_region.gtf", SCAFFOLD, H1_BROAD_START, H1_BROAD_END)
     subset_gff(H1_GFF, H1_DIR / "H1_20260127.FINAL.top20.fa.out.INV1936_H1_broad_region.gff", SCAFFOLD, H1_BROAD_START, H1_BROAD_END)
     shutil.copy2(H1_BP_BED, H1_DIR / "INV1936_H1_breakpoint.bed")
-    write_interval_beds(H1_DIR, "INV1936_H1", SCAFFOLD, H1_INV_START, H1_INV_END, H1_GENE_START, H1_GENE_END, "g13041.t1_H1")
+    write_interval_beds(H1_DIR, "INV1936_H1", SCAFFOLD, H1_INV_START, H1_INV_END, H1_GENE_START, H1_GENE_END, "g13041.t1_H1", "+")
     subset_bed(H1_LOCAL_BED, H1_DIR / "H1_INV1936_local.t1.bed", SCAFFOLD, H1_BROAD_START, H1_BROAD_END)
 
     subset_gtf(H2_GTF, H2_DIR / "braker.INV1936_H2_broad_region.gtf", SCAFFOLD, H2_BROAD_START, H2_BROAD_END)
     subset_gff(H2_GFF, H2_DIR / "H2_20260127.FINAL.top20.ordered.renamed.fa.out.INV1936_H2_broad_region.gff", SCAFFOLD, H2_BROAD_START, H2_BROAD_END)
     shutil.copy2(H2_BP_BED, H2_DIR / "INV1936_H2_breakpoint.bed")
-    write_interval_beds(H2_DIR, "INV1936_H2", SCAFFOLD, H2_INV_START, H2_INV_END, H2_GENE_START, H2_GENE_END, "g13243.t1_H2")
+    write_interval_beds(H2_DIR, "INV1936_H2", SCAFFOLD, H2_INV_START, H2_INV_END, H2_GENE_START, H2_GENE_END, "g13243.t1_H2", "-")
     subset_bed(H2_LOCAL_BED, H2_DIR / "H2_INV1936_local.t1.bed", SCAFFOLD, H2_BROAD_START, H2_BROAD_END)
 
     for bam in H1_BAMS:
