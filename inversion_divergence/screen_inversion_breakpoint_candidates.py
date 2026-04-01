@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Prioritize inversion breakpoint cases for follow-up structural/RNA inspection.
 
-This is a coarse H1-side screen intended to shortlist candidate inversions for:
+This is a coarse haplotype-side screen intended to shortlist candidate inversions for:
   - breakpoint-overlapping genes
   - promoter-proximal breakpoints
   - exon / intron-boundary-adjacent breakpoints
   - expressed nearby genes worth manual IGV follow-up
 
-It does not attempt formal differential-expression inference. Instead, it combines
-genomic breakpoint context with all-library H1 RNA abundance summaries so the top
-ranked candidates can be reviewed manually in IGV/H1-H2 follow-up.
+It does not attempt formal differential-expression inference. When expression tables
+are supplied, it combines genomic breakpoint context with all-library RNA abundance
+summaries so the top ranked candidates can be reviewed manually in IGV/H1-H2
+follow-up.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ import pandas as pd
 DEFAULT_INV = Path(
     "/g/data/xf3/zz3507/Output/20260127Genome/syri/syri_asm10/H1_vs_H2syri.highconfINV.tsv"
 )
-DEFAULT_H1_T1_BED = Path(
+DEFAULT_T1_BED = Path(
     "/g/data/xf3/zz3507/compare_H1_vs_Ophrys/New_H1_H2_ophrys_Arobx/H1t1.bed"
 )
 DEFAULT_GTF = Path("/g/data/xf3/zz3507/Output/20260127Genome/H1/breaker/braker.gtf")
@@ -62,16 +63,23 @@ class Transcript:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--inversions", type=Path, default=DEFAULT_INV)
-    p.add_argument("--h1-t1-bed", type=Path, default=DEFAULT_H1_T1_BED)
+    p.add_argument("--t1-bed", "--h1-t1-bed", dest="t1_bed", type=Path, default=DEFAULT_T1_BED)
     p.add_argument("--gtf", type=Path, default=DEFAULT_GTF)
     p.add_argument("--gene-counts", type=Path, default=DEFAULT_GENE_COUNTS)
     p.add_argument("--inv-overview", type=Path, default=DEFAULT_INV_OVERVIEW)
     p.add_argument("--hic-summary", type=Path, default=DEFAULT_HIC)
     p.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR)
+    p.add_argument("--coord-prefix", choices=["Ref", "Qry"], default="Ref")
+    p.add_argument("--label", default="H1", help="Short label for the screened haplotype/reference.")
     p.add_argument("--promoter-bp", type=int, default=2000)
     p.add_argument("--flank-bp", type=int, default=10000)
     p.add_argument("--boundary-bp", type=int, default=200)
     p.add_argument("--top-n", type=int, default=10)
+    p.add_argument(
+        "--skip-expression",
+        action="store_true",
+        help="Ignore gene-count / overview tables and run a structure-only breakpoint screen.",
+    )
     p.add_argument(
         "--strict-only",
         action="store_true",
@@ -89,6 +97,8 @@ def parse_bool(value: object) -> bool:
 
 
 def parse_gene_counts(path: Path) -> Dict[str, Tuple[float, float]]:
+    if not path or not path.exists():
+        return {}
     df = pd.read_csv(path, sep="\t", comment="#")
     sample_cols = [c for c in df.columns if c not in {"Geneid", "Chr", "Start", "End", "Strand", "Length"}]
     counts = df[sample_cols].apply(pd.to_numeric, errors="coerce")
@@ -423,7 +433,11 @@ def build_markdown_summary(
     lines = []
     lines.append("# Inversion breakpoint priority screen")
     lines.append("")
+    lines.append(f"- Screen label: `{args.label}`")
+    lines.append(f"- Coordinate prefix used: `{args.coord_prefix}`")
     lines.append(f"- Input inversion table: `{args.inversions}`")
+    lines.append(f"- Transcript BED: `{args.t1_bed}`")
+    lines.append(f"- GTF: `{args.gtf}`")
     lines.append(f"- Total inversions screened: `{inv_df.shape[0]}`")
     lines.append(f"- Promoter window: `{args.promoter_bp}` bp")
     lines.append(f"- Flanking-expression window: `{args.flank_bp}` bp")
@@ -476,8 +490,8 @@ def main() -> None:
     args = parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
 
-    expr_by_gene = parse_gene_counts(args.gene_counts)
-    tx_by_gene, tx_by_chr = load_transcripts(args.h1_t1_bed, expr_by_gene, args.promoter_bp)
+    expr_by_gene = {} if args.skip_expression else parse_gene_counts(args.gene_counts)
+    tx_by_gene, tx_by_chr = load_transcripts(args.t1_bed, expr_by_gene, args.promoter_bp)
     exon_map, intron_map = load_feature_intervals(args.gtf)
 
     inv_df = pd.read_csv(args.inversions, sep="\t")
@@ -487,7 +501,10 @@ def main() -> None:
         inv_df["strict_highconfidence"] = False
     if args.strict_only:
         inv_df = inv_df[inv_df["strict_highconfidence"]].copy()
-    inv_df = inv_df.sort_values(["RefChr", "RefStart", "RefEnd", "ID"]).reset_index(drop=True)
+    chrom_col = f"{args.coord_prefix}Chr"
+    start_col = f"{args.coord_prefix}Start"
+    end_col = f"{args.coord_prefix}End"
+    inv_df = inv_df.sort_values([chrom_col, start_col, end_col, "ID"]).reset_index(drop=True)
 
     hic_df = pd.read_csv(args.hic_summary, sep="\t") if args.hic_summary.exists() else pd.DataFrame()
     hic_map = {
@@ -499,7 +516,11 @@ def main() -> None:
         for _, row in hic_df.iterrows()
     }
 
-    overview_df = pd.read_csv(args.inv_overview, sep="\t") if args.inv_overview.exists() else pd.DataFrame()
+    overview_df = (
+        pd.read_csv(args.inv_overview, sep="\t")
+        if (not args.skip_expression and args.inv_overview and args.inv_overview.exists())
+        else pd.DataFrame()
+    )
     overview_map = {
         str(row["INV_ID"]): {
             "interior_genes_with_expression": int(row["GenesWithExpression"]),
@@ -514,9 +535,9 @@ def main() -> None:
 
     for _, inv in inv_df.iterrows():
         inv_id = str(inv["ID"])
-        chrom = str(inv["RefChr"])
-        left_bp = int(inv["RefStart"])
-        right_bp = int(inv["RefEnd"])
+        chrom = str(inv[chrom_col])
+        left_bp = int(inv[start_col])
+        right_bp = int(inv[end_col])
         transcripts = tx_by_chr.get(chrom, [])
 
         left_summary, left_events = analyze_breakpoint(
@@ -548,9 +569,14 @@ def main() -> None:
 
         row = {
             "ID": inv_id,
-            "RefChr": chrom,
-            "RefStart": left_bp,
-            "RefEnd": right_bp,
+            "ScreenLabel": args.label,
+            "CoordPrefix": args.coord_prefix,
+            "ScreenChr": chrom,
+            "ScreenStart": left_bp,
+            "ScreenEnd": right_bp,
+            "RefChr": str(inv["RefChr"]),
+            "RefStart": int(inv["RefStart"]),
+            "RefEnd": int(inv["RefEnd"]),
             "RefLen": int(inv["RefLen"]),
             "QryChr": str(inv["QryChr"]),
             "QryStart": int(inv["QryStart"]),
