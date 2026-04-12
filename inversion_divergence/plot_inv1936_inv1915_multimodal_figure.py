@@ -22,7 +22,7 @@ DEFAULT_INV_IDS = ["INV1936", "INV1915"]
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Build publication-style composite inversion figure for INV1936 and INV1915")
+    p = argparse.ArgumentParser(description="Build publication-style composite inversion figure for selected inversions")
     p.add_argument("--inv-tsv", default="Output/20260127Genome/H1/inversion_rna_minimap2_stage_sun_flower_L/inv_rna_expr_minimap2_sun_flower_L.selected_inversions.for_hic.tsv")
     p.add_argument("--inv-ids", default=",".join(DEFAULT_INV_IDS))
     p.add_argument("--hic-summary", default="Output/20260127Genome/hic_inv_context_joint_INV1936_INV1915/hic_inv_context.summary.tsv")
@@ -36,6 +36,7 @@ def parse_args():
     p.add_argument("--h2-func", default="Output/20260127Genome/functional_annotation/H2.Functional_Annotation_results.txt")
     p.add_argument("--outdir", default="Output/20260127Genome/inversion_pubfig_INV1936_INV1915_sunflower_L")
     p.add_argument("--prefix", default="INV1936_INV1915_multimodal_pubfig")
+    p.add_argument("--figure-title", default="")
     p.add_argument(
         "--rna-label",
         default="sunflower-stage labellum RNA counts (UV-treated subset; n=3 replicates)",
@@ -44,6 +45,16 @@ def parse_args():
     p.add_argument("--gene-flank-max", type=int, default=300000)
     p.add_argument("--gene-flank-min", type=int, default=150000)
     return p.parse_args()
+
+
+def compact_inv_label(inv_ids):
+    if not inv_ids:
+        return "selected inversions"
+    if len(inv_ids) == 1:
+        return inv_ids[0]
+    if len(inv_ids) == 2:
+        return f"{inv_ids[0]} and {inv_ids[1]}"
+    return f"{', '.join(inv_ids[:-1])}, and {inv_ids[-1]}"
 
 
 def clean_str(x):
@@ -776,7 +787,8 @@ def main():
     outer = fig.add_gridspec(nrows=nrows, ncols=4, width_ratios=[8.8, 1.7, 6.8, 5.8], hspace=0.30, wspace=0.18)
 
     # header
-    fig.text(0.012, 0.995, 'Comparative inversion panels for INV1936 and INV1915 (H1 vs H2)',
+    title_text = clean_str(args.figure_title) or f"Comparative inversion panels for {compact_inv_label(inv_ids)} (H1 vs H2)"
+    fig.text(0.012, 0.995, title_text,
              ha='left', va='top', fontsize=15, fontweight='bold')
     fig.text(0.012, 0.980,
              f"Left panel uses overview+zoom gene organization (t1-only). Middle panels summarize H1 inversion-overlap {args.rna_label} (bar = mean log2(count+1); heatmap = within-gene z-score after log2 transform). Right panel shows inter-haplotype Hi-C context.",
