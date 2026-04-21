@@ -23,9 +23,9 @@ BRAKER_SIF="/g/data/xf3/zz3507/app/braker3.sif"
 ############################################
 # Auto-detect masked genome file
 ############################################
-GENOME_MASKED="$(ls -1 ${RM_DIR}/*.masked 2>/dev/null | head -n 1 || true)"
+GENOME_MASKED="$(find "${RM_DIR}" -type f -name 'H1_2026_v1.top20.fa.masked' | head -n 1 || true)"
 if [[ -z "${GENOME_MASKED}" ]]; then
-  echo "ERROR: cannot find masked genome (*.masked) in ${RM_DIR}" >&2
+  echo "ERROR: cannot find H1_2026_v1.top20.fa.masked under ${RM_DIR}" >&2
   exit 1
 fi
 

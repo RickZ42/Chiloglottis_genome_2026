@@ -1,0 +1,47 @@
+#!/bin/bash
+#PBS -N blastH2_ntscreen
+#PBS -P xf3
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l ncpus=48
+#PBS -l mem=192GB
+#PBS -l jobfs=400GB
+#PBS -l storage=scratch/xf3+gdata/xf3+gdata/xe2
+#PBS -l wd
+
+set -euo pipefail
+set -x
+
+GENOME="/g/data/xf3/zz3507/Output/20260127Genome/H2/H2_20260127.FINAL.top20.ordered.renamed.fa"
+OUTDIR="/g/data/xf3/zz3507/Output/20260127Genome/H2/blast_non_orchid_screen"
+SCRIPT_DIR="/g/data/xf3/zz3507/script/Chiloglottis_genome_2026/H2"
+PYTHON="/g/data/xf3/miniconda/bin/python"
+BLAST_DB="/g/data/xf3/database/nt2024Apr10/nt"
+TAXONOMY_SQLITE="/g/data/xf3/database/nt2024Apr10/taxonomy4blast.sqlite3"
+BLASTN_BIN="/g/data/xf3/zz3507/envs/snake/.snakemake/conda/a1f9fed144168db57f32b6fd83bd9739_/bin/blastn"
+
+if [[ ! -x "${BLASTN_BIN}" ]]; then
+  BLASTN_BIN="$(find /g/data/xf3/zz3507/envs/snake/.snakemake/conda -maxdepth 3 -type f -name blastn | head -n 1 || true)"
+fi
+
+if [[ -z "${BLASTN_BIN}" || ! -x "${BLASTN_BIN}" ]]; then
+  echo "ERROR: cannot find blastn binary in cached snakemake conda envs" >&2
+  exit 1
+fi
+
+mkdir -p "${OUTDIR}"
+
+# Safe default:
+#   non_plant   -> auto-remove only contigs with no Viridiplantae hits
+#   non_orchid  -> also auto-remove plant hits that are not Orchidaceae (review first)
+REMOVE_SCOPE="${REMOVE_SCOPE:-non_plant}"
+
+"${PYTHON}" "${SCRIPT_DIR}/blast_H2_non_orchid_screen.py" \
+  --genome "${GENOME}" \
+  --outdir "${OUTDIR}" \
+  --blastn-bin "${BLASTN_BIN}" \
+  --blast-db "${BLAST_DB}" \
+  --taxonomy-sqlite "${TAXONOMY_SQLITE}" \
+  --threads 48 \
+  --parallel-jobs 8 \
+  --remove-scope "${REMOVE_SCOPE}"

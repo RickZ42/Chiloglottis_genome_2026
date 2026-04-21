@@ -1,0 +1,55 @@
++ module load singularity
++ unset _mlshdbg
++ '[' 0 = 1 ']'
++ unset _mlre _mlIFS
++ '[' -n x ']'
++ _mlIFS=' 	
+'
++ IFS=' '
++ '[' -n '' ']'
+++ /usr/bin/tclsh /opt/Modules/v4.3.0/libexec/modulecmd.tcl bash load singularity
++ eval '_LMFILES__modshare=/opt/Modules/modulefiles/singularity:1;' export '_LMFILES__modshare;
+LOADEDMODULES_modshare=singularity:1;' export 'LOADEDMODULES_modshare;
+MODULES_LMCONFLICT_modshare=singularity\&apptainer:1;' export 'MODULES_LMCONFLICT_modshare;
+PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin;' export 'PATH;
+_LMFILES_=/opt/Modules/modulefiles/singularity;' export '_LMFILES_;
+LOADEDMODULES=singularity;' export 'LOADEDMODULES;
+MODULES_LMCONFLICT=singularity\&apptainer;' export 'MODULES_LMCONFLICT;
+PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1;' export 'PATH_modshare;
+test' '0;'
+++ _LMFILES__modshare=/opt/Modules/modulefiles/singularity:1
+++ export _LMFILES__modshare
+++ LOADEDMODULES_modshare=singularity:1
+++ export LOADEDMODULES_modshare
+++ MODULES_LMCONFLICT_modshare='singularity&apptainer:1'
+++ export MODULES_LMCONFLICT_modshare
+++ PATH=/g/data/xf3/miniconda/bin:/g/data/xf3/miniconda/condabin:/opt/pbs/default/bin:/opt/nci/bin:/opt/bin:/opt/Modules/v4.3.0/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/local/pbs/bin:/opt/singularity/bin
+++ export PATH
+++ _LMFILES_=/opt/Modules/modulefiles/singularity
+++ export _LMFILES_
+++ LOADEDMODULES=singularity
+++ export LOADEDMODULES
+++ MODULES_LMCONFLICT='singularity&apptainer'
+++ export MODULES_LMCONFLICT
+++ PATH_modshare=/usr/bin:1:/opt/Modules/v4.3.0/bin:1:/opt/bin:1:/opt/singularity/bin:1:/g/data/xf3/miniconda/condabin:1:/local/pbs/bin:1:/bin:1:/g/data/xf3/miniconda/bin:1:/opt/pbs/default/bin:1:/opt/nci/bin:1:/usr/sbin:1:/usr/local/sbin:1
+++ export PATH_modshare
+++ test 0
++ _mlstatus=0
++ '[' -n x ']'
++ IFS=' 	
+'
++ unset _mlre _mlv _mlrv _mlIFS
++ '[' -n '' ']'
++ unset _mlshdbg
++ return 0
++ RM_DIR=/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ WORKDIR=/g/data/xf3/zz3507/Output/20260127Genome/H1/breakerWithNewRNAApr20
++ BRAKER_SIF=/g/data/xf3/zz3507/app/braker3.sif
+++ head -n 1
+++ ls -1 '/g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker/*.masked'
+++ true
++ GENOME_MASKED=
++ [[ -z '' ]]
++ echo 'ERROR: cannot find masked genome (*.masked) in /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker'
+ERROR: cannot find masked genome (*.masked) in /g/data/xf3/zz3507/Output/AfterHiCProcessing/2026Updatedgenome/H1/RepeatMasker
++ exit 1
