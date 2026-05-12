@@ -84,6 +84,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--title", default="H1 RNA expression", help="Panel title.")
     p.add_argument("--bar-color", default="#4C78A8", help="Expression bar fill color.")
     p.add_argument("--bar-outline", default="#274E76", help="Expression bar border color.")
+    p.add_argument(
+        "--plot-style",
+        choices=["interval-bar", "fixed-bar", "dot"],
+        default="interval-bar",
+        help=(
+            "How to render each expressed gene. interval-bar uses gene start/end, "
+            "fixed-bar uses equal-width bars at gene centers, and dot uses one point per gene."
+        ),
+    )
+    p.add_argument("--bar-width-px", type=int, default=6, help="Width for --plot-style fixed-bar.")
+    p.add_argument("--dot-radius-px", type=int, default=5, help="Point radius for --plot-style dot.")
     p.add_argument("--inv-shade-color", default="#F57C00", help="Inversion interval highlight color.")
     p.add_argument(
         "--minimal-text",
@@ -430,6 +441,9 @@ def draw_expression_panel(
     title: str,
     bar_color: str,
     bar_outline: str,
+    plot_style: str,
+    bar_width_px: int,
+    dot_radius_px: int,
     inv_shade_color: str,
     minimal_text: bool,
     hide_x_axis: bool,
@@ -491,19 +505,45 @@ def draw_expression_panel(
         expr = expr_map.get(trim_transcript(feat.name))
         if expr is None:
             continue
-        bar_x0 = x_from_bp(feat.start, genome_start, genome_end, x0, x1)
-        bar_x1 = x_from_bp(feat.end, genome_start, genome_end, x0, x1)
-        if bar_x1 <= bar_x0:
-            bar_x1 = bar_x0 + 1
         scaled_expr = min(expr.mean_expr, ymax)
-        bar_top = plot_bottom - (scaled_expr / ymax) * plot_height
-        bar_top = max(plot_top, bar_top)
-        draw.rectangle(
-            [(bar_x0, bar_top), (bar_x1, plot_bottom)],
-            fill=rgba(bar_color, 210),
-            outline=rgba(bar_outline),
-            width=1,
-        )
+        value_y = plot_bottom - (scaled_expr / ymax) * plot_height
+        value_y = max(plot_top, value_y)
+
+        if plot_style == "interval-bar":
+            bar_x0 = x_from_bp(feat.start, genome_start, genome_end, x0, x1)
+            bar_x1 = x_from_bp(feat.end, genome_start, genome_end, x0, x1)
+            if bar_x1 <= bar_x0:
+                bar_x1 = bar_x0 + 1
+            draw.rectangle(
+                [(bar_x0, value_y), (bar_x1, plot_bottom)],
+                fill=rgba(bar_color, 210),
+                outline=rgba(bar_outline),
+                width=1,
+            )
+        else:
+            center_bp = (feat.start + feat.end) / 2.0
+            center_x = x_from_bp(center_bp, genome_start, genome_end, x0, x1)
+            if plot_style == "fixed-bar":
+                half_width = max(1.0, bar_width_px / 2.0)
+                draw.rectangle(
+                    [(center_x - half_width, value_y), (center_x + half_width, plot_bottom)],
+                    fill=rgba(bar_color, 210),
+                    outline=rgba(bar_outline),
+                    width=1,
+                )
+            elif plot_style == "dot":
+                radius = max(2, dot_radius_px)
+                draw.ellipse(
+                    [
+                        (center_x - radius, value_y - radius),
+                        (center_x + radius, value_y + radius),
+                    ],
+                    fill=rgba(bar_color, 230),
+                    outline=rgba(bar_outline),
+                    width=2,
+                )
+            else:
+                raise ValueError(f"Unsupported plot style: {plot_style}")
 
     if not hide_x_axis:
         start_label = format_mb(genome_start)
@@ -582,6 +622,9 @@ def main() -> None:
         title=args.title,
         bar_color=args.bar_color,
         bar_outline=args.bar_outline,
+        plot_style=args.plot_style,
+        bar_width_px=args.bar_width_px,
+        dot_radius_px=args.dot_radius_px,
         inv_shade_color=args.inv_shade_color,
         minimal_text=args.minimal_text,
         hide_x_axis=args.hide_x_axis,
