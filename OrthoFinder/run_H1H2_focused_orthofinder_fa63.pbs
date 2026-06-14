@@ -1,0 +1,33 @@
+#!/bin/bash
+#PBS -N H1H2_OF_focus
+#PBS -P fa63
+#PBS -q normal
+#PBS -l walltime=48:00:00
+#PBS -l ncpus=48
+#PBS -l mem=180GB
+#PBS -l jobfs=400GB
+#PBS -l storage=scratch/xf3+gdata/xf3+gdata/xe2
+#PBS -m abe
+#PBS -M Zirui.Zhang@anu.edu.au
+#PBS -l wd
+
+set -euo pipefail
+
+DATASET_DIR="/g/data/xf3/zz3507/database/Chiloglottis_H1H2_focused_OrthoFinder_20260614"
+
+source /g/data/xf3/miniconda/etc/profile.d/conda.sh
+conda activate orthofinder
+
+echo "Started focused H1/H2 OrthoFinder run at $(date)"
+echo "Dataset: ${DATASET_DIR}"
+echo "Input FASTA files:"
+find "${DATASET_DIR}" -maxdepth 1 -type f \( -name "*.fa" -o -name "*.faa" -o -name "*.fasta" \) -print | sort
+
+orthofinder \
+  -f "${DATASET_DIR}" \
+  -t 40 \
+  -a 8 \
+  -I 1.3 \
+  -M msa
+
+echo "Finished focused H1/H2 OrthoFinder run at $(date)"
